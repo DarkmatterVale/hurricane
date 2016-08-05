@@ -1,6 +1,7 @@
 import socket
 import pickle
 import struct
+from .utils import scan_network
 
 class SlaveNode:
 

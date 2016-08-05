@@ -7,6 +7,14 @@ Hurricane is a simple to use peer-to-peer communication protocol built on top of
 
 Python's native socket library is used to create a stream to connect multiple computers and send data between.
 
+## External Dependencies
+
+The following must be installed externally to use this program:
+
+```
+brew install libdnet
+```
+
 ## History
 
 See release notes for changes https://github.com/DarkmatterVale/hurricane/releases
