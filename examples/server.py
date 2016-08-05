@@ -1,6 +1,6 @@
 from hurricane import MasterNode
 
-server = MasterNode()
+server = MasterNode(debug=True)
 
 print ("[*] Server initialized")
 

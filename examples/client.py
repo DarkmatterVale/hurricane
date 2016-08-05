@@ -1,10 +1,14 @@
 from hurricane import SlaveNode
 
-client = SlaveNode()
+client = SlaveNode(debug=True)
 
 print("[*] Initializing the node...")
 client.initialize()
 client.wait_for_initialize()
 
 print("[*] Printing data gathered from the node:")
-print(client.receive_data()["name"])
+data = client.receive_data()
+if data != None:
+    print(data["name"])
+else:
+    print("Can't get data...please retry")

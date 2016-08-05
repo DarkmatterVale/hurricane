@@ -7,7 +7,13 @@ from .utils import scan_network
 class SlaveNode:
 
     def __init__(self, **kwargs):
-        self.port = kwargs.get('port', 12222)
+        if kwargs.get('debug') == None:
+            self.debug = False
+        else:
+            self.debug = True
+
+        self.data_port = kwargs.get('data_port', 12222)
+        self.initialize_port = kwargs.get('initialize_port', 12223)
         self.master_node_address = kwargs.get('master_node', '')
         self.socket = socket.socket()
         self.scanning_process = None
@@ -62,10 +68,8 @@ class SlaveNode:
         if not self.master_node_init_status():
             return None
 
-        print(self.master_node_address)
-
         try:
-            self.socket.connect((self.master_node_address, self.port))
+            self.socket.connect((self.master_node_address, self.data_port))
 
             raw_msglen = self.socket.recv(4)
             msglen = struct.unpack('>I', raw_msglen)[0]
@@ -84,9 +88,31 @@ class SlaveNode:
         Scan the local network & determine all of the active IP addresses.
         """
         # Scan the network
+        if self.debug:
+            print("[*] Scanning the network to identify active hosts...")
         ip_addresses = scan_network()
         ip_addresses.extend(['127.0.0.1'])
 
         # Identify the master node
-        # Send the address of the master node to the upper thread
-        self.scanner_output.send('127.0.0.1')
+        for address in ip_addresses:
+            if self.debug:
+                print("[*] Attempting to connect to " + str(address) + " on port " + str(self.initialize_port) + "...")
+            try:
+                self.socket.connect((address, self.initialize_port))
+
+                raw_msglen = self.socket.recv(4)
+                msglen = struct.unpack('>I', raw_msglen)[0]
+                data = self.socket.recv(msglen)
+                data = pickle.loads(data)
+
+                self.socket.close()
+
+                if data["message"] == "connected":
+                    # Send the address of the master node to the upper thread
+                    self.scanner_output.send(address)
+
+                    break
+            except:
+                continue
+
+            self.scanner_output.send('127.0.0.1')
