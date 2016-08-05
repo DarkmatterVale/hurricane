@@ -8,8 +8,7 @@ class SlaveNode:
         self.port = kwargs.get('port', 12222)
         self.master_node_address = kwargs.get('master_node', '127.0.0.1')
 
-        if self.socket == None:
-            self.socket = socket.socket()
+        self.socket = socket.socket()
 
     def create_socket(self, host, port):
         """
