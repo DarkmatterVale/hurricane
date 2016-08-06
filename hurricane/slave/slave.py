@@ -106,14 +106,14 @@ class SlaveNode:
             try:
                 self.socket.connect((address, self.initialize_port))
 
-                raw_msglen = self.socket.recv(4)
-                msglen = struct.unpack('>I', raw_msglen)[0]
-                data = self.socket.recv(msglen)
-                data = pickle.loads(data)
+                data = read_data(self.socket)
 
                 self.socket.close()
 
-                if data["message"] == "connected":
+                if data["is_connected"] == True:
+                    if self.debug:
+                        print("[*] Successfully connected to " + str(address))
+
                     # Send the address of the master node to the upper thread
                     self.scanner_output.send(address)
 
