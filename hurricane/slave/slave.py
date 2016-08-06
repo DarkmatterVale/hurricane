@@ -1,18 +1,13 @@
 import socket
-import pickle
 import errno
-import struct
 import multiprocessing
-from .utils import scan_network
+from hurricane.utils import scan_network
+from hurricane.utils import read_data
 
 class SlaveNode:
 
     def __init__(self, **kwargs):
-        if kwargs.get('debug') == None:
-            self.debug = False
-        else:
-            self.debug = True
-
+        self.debug = kwargs.get('debug', False)
         self.data_port = kwargs.get('data_port', 12222)
         self.initialize_port = kwargs.get('initialize_port', 12223)
         self.master_node_address = kwargs.get('master_node', '')
@@ -74,14 +69,10 @@ class SlaveNode:
         try:
             self.socket = socket.socket()
             self.socket.connect((self.master_node_address, self.data_port))
-
-            raw_msglen = self.socket.recv(4)
-            msglen = struct.unpack('>I', raw_msglen)[0]
-
-            data = self.socket.recv(msglen)
-            data = pickle.loads(data)
-
+            data = read_data(self.socket)
             self.socket.close()
+
+            return data
         except socket.error as err:
             if err.errno == errno.ECONNREFUSED:
                 if self.debug:
@@ -91,8 +82,6 @@ class SlaveNode:
                 if self.debug:
                     print("[*] ERROR : Unknown error thrown when attempting to connect to " + self.master_node_address + " on port " + str(self.data_port))
                 return None
-
-        return data
 
     def complete_network_scan(self):
         """
