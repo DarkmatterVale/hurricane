@@ -11,7 +11,7 @@ class SlaveNode:
         self.data_port = kwargs.get('data_port', 12222)
         self.initialize_port = kwargs.get('initialize_port', 12223)
         self.master_node_address = kwargs.get('master_node', '')
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.scanning_process = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
@@ -48,16 +48,6 @@ class SlaveNode:
 
         return False
 
-    def create_socket(self, host, port):
-        """
-        Initialize the socket & connect it to the host on the port port.
-        """
-        if self.socket == None:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        self.port = port
-        self.master_node_address = host
-
     def receive_data(self):
         """
         Receive data from the socket.
@@ -66,10 +56,10 @@ class SlaveNode:
             return None
 
         try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((self.master_node_address, self.data_port))
-            data = read_data(self.socket)
-            self.socket.close()
+            self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.task_socket.connect((self.master_node_address, self.data_port))
+            data = read_data(self.task_socket)
+            self.task_socket.close()
 
             return data
         except socket.error as err:
@@ -97,17 +87,17 @@ class SlaveNode:
 
         # Identify the master node
         for address in ip_addresses:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            initialize_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             if self.debug:
-                print("[*] Attempting to connect to " + str(address))
+                print("[*] Attempting to connect to " + str(address) + "...")
 
             try:
-                self.socket.connect((address, self.initialize_port))
+                initialize_socket.connect((address, self.initialize_port))
 
-                data = read_data(self.socket)
+                data = read_data(initialize_socket)
 
-                self.socket.close()
+                initialize_socket.close()
 
                 if data["is_connected"] == True:
                     if self.debug:
