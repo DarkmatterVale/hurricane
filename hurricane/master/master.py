@@ -42,7 +42,7 @@ class MasterNode:
             c, addr = initialize_socket.accept()
 
             if self.debug:
-                print("[*] Got initialization connection from " + str(addr))
+                print("[*] Identified new node at " + str(addr))
 
             self.scanner_output.send(str(addr))
 

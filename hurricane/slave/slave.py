@@ -39,7 +39,7 @@ class SlaveNode:
         """
         if self.scanner_input.poll():
             self.master_node_address = self.scanner_input.recv()
-            self.scanning_process = None
+            self.scanning_process.terminate()
 
         if self.master_node_address != '':
             return True
@@ -80,8 +80,8 @@ class SlaveNode:
         if self.master_node_address == '':
             if self.debug:
                 print("[*] Scanning the network to identify active hosts...")
-            ip_addresses = scan_network()
-            ip_addresses.extend(['127.0.0.1'])
+            ip_addresses = ['127.0.0.1']
+            ip_addresses.extend(scan_network())
         else:
             ip_addresses = [self.master_node_address]
 
@@ -94,9 +94,7 @@ class SlaveNode:
 
             try:
                 initialize_socket.connect((address, self.initialize_port))
-
                 data = read_data(initialize_socket)
-
                 initialize_socket.close()
 
                 if data["is_connected"] == True:
@@ -106,8 +104,8 @@ class SlaveNode:
                     # Send the address of the master node to the upper thread
                     self.scanner_output.send(address)
 
-                    break
+                    return
             except:
                 continue
 
-        self.scanner_output.send('127.0.0.1')
+        self.complete_network_scan()
