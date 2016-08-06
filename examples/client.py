@@ -6,4 +6,5 @@ client.initialize()
 client.wait_for_initialize()
 
 while True:
-    client.wait_for_task()
+    task = client.wait_for_task()
+    print("[*] Task name: " + str(task["name"]))

@@ -5,6 +5,7 @@ server = MasterNode(debug=True)
 server.initialize()
 
 server.wait_for_connection()
-server.send_task({"name" : "server"})
-sleep(5)
-server.send_task({"name" : "server2"})
+while True:
+    server.send_task({"name" : "server"})
+    sleep(5)
+    server.send_task({"name" : "server2"})

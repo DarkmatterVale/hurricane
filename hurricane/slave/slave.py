@@ -68,7 +68,7 @@ class SlaveNode:
         data = read_data(c)
         c.close()
 
-        return data
+        return data["data"]
 
     def complete_network_scan(self):
         """
