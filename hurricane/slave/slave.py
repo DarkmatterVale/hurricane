@@ -37,10 +37,9 @@ class SlaveNode:
 
         @returns True if the master node has been identified, False if not
         """
-        if self.scanning_process != None:
-            if self.scanner_input.poll():
-                self.master_node_address = self.scanner_input.recv()
-                self.scanning_process = None
+        if self.scanner_input.poll():
+            self.master_node_address = self.scanner_input.recv()
+            self.scanning_process = None
 
         if self.master_node_address != '':
             return True

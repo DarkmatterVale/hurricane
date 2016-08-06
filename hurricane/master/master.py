@@ -42,7 +42,7 @@ class MasterNode:
             c, addr = initialize_socket.accept()
 
             if self.debug:
-                print("[*] Got initialization connection from " + str(addr) + " on port " + str(self.initialize_port))
+                print("[*] Got initialization connection from " + str(addr))
 
             self.scanner_output.send(str(addr))
 
