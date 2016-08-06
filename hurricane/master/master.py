@@ -13,7 +13,7 @@ class MasterNode:
         self.hosts = []
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
-        self.data_socket = socket.socket()
+        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.data_socket.bind(('', self.data_port))
         self.data_socket.listen(self.max_connections)
 
@@ -29,7 +29,7 @@ class MasterNode:
         """
         Identify slave nodes.
         """
-        initialize_socket = socket.socket()
+        initialize_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         initialize_socket.bind(('', self.initialize_port))
         initialize_socket.listen(self.max_connections)
 

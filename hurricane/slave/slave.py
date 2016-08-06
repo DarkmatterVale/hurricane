@@ -11,7 +11,7 @@ class SlaveNode:
         self.data_port = kwargs.get('data_port', 12222)
         self.initialize_port = kwargs.get('initialize_port', 12223)
         self.master_node_address = kwargs.get('master_node', '')
-        self.socket = socket.socket()
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.scanning_process = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
@@ -54,7 +54,7 @@ class SlaveNode:
         Initialize the socket & connect it to the host on the port port.
         """
         if self.socket == None:
-            self.socket = socket.socket()
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.port = port
         self.master_node_address = host
@@ -67,7 +67,7 @@ class SlaveNode:
             return None
 
         try:
-            self.socket = socket.socket()
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.master_node_address, self.data_port))
             data = read_data(self.socket)
             self.socket.close()
@@ -98,10 +98,10 @@ class SlaveNode:
 
         # Identify the master node
         for address in ip_addresses:
-            self.socket = socket.socket()
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             if self.debug:
-                print("[*] Attempting to connect to " + str(address) + " on port " + str(self.initialize_port) + "...")
+                print("[*] Attempting to connect to " + str(address))
 
             try:
                 self.socket.connect((address, self.initialize_port))
