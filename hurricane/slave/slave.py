@@ -1,5 +1,6 @@
 import socket
 import pickle
+import errno
 import struct
 import multiprocessing
 from .utils import scan_network
@@ -49,6 +50,8 @@ class SlaveNode:
         if self.master_node_address != '':
             return True
 
+        print("RETURNING FALSE FOR master_node_init_status")
+
         return False
 
     def create_socket(self, host, port):
@@ -69,6 +72,7 @@ class SlaveNode:
             return None
 
         try:
+            self.socket = socket.socket()
             self.socket.connect((self.master_node_address, self.data_port))
 
             raw_msglen = self.socket.recv(4)
@@ -78,25 +82,38 @@ class SlaveNode:
             data = pickle.loads(data)
 
             self.socket.close()
+        except socket.error as err:
+            if err.errno == errno.ECONNREFUSED:
+                if self.debug:
+                    print("[*] ERROR : Connection refused when attempting to connect to " + self.master_node_address + " on port " + str(self.data_port))
+                return None
+            else:
+                if self.debug:
+                    print("[*] ERROR : Unknown error thrown when attempting to connect to " + self.master_node_address + " on port " + str(self.data_port))
+                return None
 
-            return data
-        except:
-            return None
+        return data
 
     def complete_network_scan(self):
         """
         Scan the local network & determine all of the active IP addresses.
         """
-        # Scan the network
-        if self.debug:
-            print("[*] Scanning the network to identify active hosts...")
-        ip_addresses = scan_network()
-        ip_addresses.extend(['127.0.0.1'])
+        # Scan the network (if necessary)
+        if self.master_node_address == '':
+            if self.debug:
+                print("[*] Scanning the network to identify active hosts...")
+            ip_addresses = scan_network()
+            ip_addresses.extend(['127.0.0.1'])
+        else:
+            ip_addresses = [self.master_node_address]
 
         # Identify the master node
         for address in ip_addresses:
+            self.socket = socket.socket()
+
             if self.debug:
                 print("[*] Attempting to connect to " + str(address) + " on port " + str(self.initialize_port) + "...")
+
             try:
                 self.socket.connect((address, self.initialize_port))
 
@@ -115,4 +132,4 @@ class SlaveNode:
             except:
                 continue
 
-            self.scanner_output.send('127.0.0.1')
+        self.scanner_output.send('127.0.0.1')
