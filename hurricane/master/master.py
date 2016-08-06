@@ -1,5 +1,7 @@
 import socket
 import multiprocessing
+import errno
+from time import sleep
 from hurricane.utils import encode_data
 
 class MasterNode:
@@ -13,14 +15,12 @@ class MasterNode:
         self.hosts = []
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
-        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.data_socket.bind(('', self.data_port))
-        self.data_socket.listen(self.max_connections)
-
     def initialize(self):
         """
         This method runs in the background and attempts to identify slaves to use.
         """
+        if self.debug:
+            print("[*] Initializing the master node...")
         self.scanning_process = multiprocessing.Process(target=self.identify_slaves)
         self.scanning_process.daemon = True
         self.scanning_process.start()
@@ -44,7 +44,7 @@ class MasterNode:
             if self.debug:
                 print("[*] Identified new node at " + str(addr))
 
-            self.scanner_output.send(str(addr))
+            self.scanner_output.send(addr)
 
             c.send(encode_data(data))
             c.close()
@@ -55,7 +55,9 @@ class MasterNode:
         discovered.
         """
         while self.scanner_input.poll():
-            self.hosts.extend(self.scanner_input.recv())
+            new_node = []
+            new_node.extend(self.scanner_input.recv())
+            self.hosts.extend([new_node[0]])
 
     def send_data(self, data):
         """
@@ -70,3 +72,38 @@ class MasterNode:
 
         c.send(encode_data(data))
         c.close()
+
+    def wait_for_connection(self):
+        """
+        Block the current thread until there is a slave node to send tasks to
+        """
+        if self.debug:
+            print("[*] Waiting for a connection...")
+
+        while self.hosts == []:
+            self.update_hosts()
+            sleep(0.1)
+
+    def send_task(self, data):
+        """
+        Distribute a task to a slave node.
+        """
+        if self.hosts == []:
+            return
+
+        final_data = {
+            "data" : data
+        }
+
+        try:
+            task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            task_socket.connect((self.hosts[0], self.data_port))
+            task_socket.send(encode_data(final_data))
+            task_socket.close()
+        except socket.error as err:
+            if err.errno == errno.ECONNREFUSED:
+                if self.debug:
+                    print("[*] ERROR : Connection refused when attempting to send a task to " + self.hosts[0])
+            else:
+                if self.debug:
+                    print("[*] ERROR : Unknown error thrown when attempting to send a task to " + self.hosts[0])

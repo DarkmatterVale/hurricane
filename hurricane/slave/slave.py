@@ -1,6 +1,7 @@
 import socket
 import errno
 import multiprocessing
+from time import sleep
 from hurricane.utils import scan_network
 from hurricane.utils import read_data
 
@@ -11,7 +12,6 @@ class SlaveNode:
         self.data_port = kwargs.get('data_port', 12222)
         self.initialize_port = kwargs.get('initialize_port', 12223)
         self.master_node_address = kwargs.get('master_node', '')
-        self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.scanning_process = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
@@ -19,6 +19,9 @@ class SlaveNode:
         """
         Initialize the slave node; scan the network and identify the master node.
         """
+        if self.debug:
+            print("[*] Initializing the node...")
+
         self.scanning_process = multiprocessing.Process(target=self.complete_network_scan)
         self.scanning_process.start()
 
@@ -44,33 +47,28 @@ class SlaveNode:
         if self.master_node_address != '':
             return True
 
-        print("RETURNING FALSE FOR master_node_init_status")
-
         return False
 
-    def receive_data(self):
+    def wait_for_task(self):
         """
-        Receive data from the socket.
+        Wait for a task to be sent on the data port.
         """
-        if not self.master_node_init_status():
-            return None
+        self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.task_socket.bind(('', self.data_port))
+        self.task_socket.listen(1)
 
-        try:
-            self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.task_socket.connect((self.master_node_address, self.data_port))
-            data = read_data(self.task_socket)
-            self.task_socket.close()
+        if self.debug:
+            print("[*] Waiting to receive a task on port " + str(self.data_port))
 
-            return data
-        except socket.error as err:
-            if err.errno == errno.ECONNREFUSED:
-                if self.debug:
-                    print("[*] ERROR : Connection refused when attempting to connect to " + self.master_node_address + " on port " + str(self.data_port))
-                return None
-            else:
-                if self.debug:
-                    print("[*] ERROR : Unknown error thrown when attempting to connect to " + self.master_node_address + " on port " + str(self.data_port))
-                return None
+        c, addr = self.task_socket.accept()
+
+        if self.debug:
+            print("[*] Received a new task from " + str(addr))
+
+        data = read_data(c)
+        c.close()
+
+        return data
 
     def complete_network_scan(self):
         """
@@ -104,8 +102,12 @@ class SlaveNode:
                     # Send the address of the master node to the upper thread
                     self.scanner_output.send(address)
 
+                    # Update the data port
+                    self.data_port = data["data_port"]
+
                     return
             except:
                 continue
 
+        sleep(1)
         self.complete_network_scan()
