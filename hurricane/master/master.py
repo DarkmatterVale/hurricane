@@ -3,12 +3,14 @@ import multiprocessing
 import errno
 from time import sleep
 from hurricane.utils import encode_data
+from hurricane.utils import create_active_socket
+from hurricane.utils import create_listen_socket
 
 class MasterNode:
 
     def __init__(self, **kwargs):
-        self.initialize_port = kwargs.get('initialize_port', 12223)
-        self.task_port = kwargs.get('task_port', 12222)
+        self.initialize_port = kwargs.get('initialize_port', 12222)
+        self.task_port = kwargs.get('task_port', 12223)
         self.max_connections = kwargs.get('connections', 20)
         self.debug = kwargs.get('debug', False)
 
@@ -29,10 +31,7 @@ class MasterNode:
         """
         Identify slave nodes.
         """
-        initialize_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        initialize_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        initialize_socket.bind(('', self.initialize_port))
-        initialize_socket.listen(self.max_connections)
+        initialize_socket = create_listen_socket(self.initialize_port, self.max_connections)
 
         data = {
             "is_connected" : True,
@@ -84,8 +83,7 @@ class MasterNode:
 
         for host in self.hosts:
             try:
-                task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                task_socket.connect((host, self.task_port))
+                task_socket = create_active_socket(host, self.task_port)
 
                 if self.debug:
                     print("[*] Sending a new task to " + str(host))

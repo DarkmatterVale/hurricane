@@ -4,13 +4,15 @@ import multiprocessing
 from time import sleep
 from hurricane.utils import scan_network
 from hurricane.utils import read_data
+from hurricane.utils import create_active_socket
+from hurricane.utils import create_listen_socket
 
 class SlaveNode:
 
     def __init__(self, **kwargs):
         self.debug = kwargs.get('debug', False)
-        self.task_port = kwargs.get('task_port', 12222)
-        self.initialize_port = kwargs.get('initialize_port', 12223)
+        self.task_port = kwargs.get('task_port', 12223)
+        self.initialize_port = kwargs.get('initialize_port', 12222)
         self.master_node_address = kwargs.get('master_node', '')
         self.scanning_process = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
@@ -91,13 +93,11 @@ class SlaveNode:
         # Identify the master node
         while True:
             for address in ip_addresses:
-                initialize_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
                 if self.debug:
                     print("[*] Attempting to connect to " + str(address) + "...")
 
                 try:
-                    initialize_socket.connect((address, self.initialize_port))
+                    initialize_socket = create_active_socket(address, self.initialize_port)
                     data = read_data(initialize_socket)
                     initialize_socket.close()
 
