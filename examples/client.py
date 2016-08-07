@@ -1,6 +1,6 @@
 from hurricane import SlaveNode
 
-client = SlaveNode(debug=True, master_node='127.0.0.1')
+client = SlaveNode(debug=True)
 
 client.initialize()
 client.wait_for_initialize()

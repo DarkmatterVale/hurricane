@@ -11,11 +11,11 @@ class MasterNode:
     def __init__(self, **kwargs):
         self.initialize_port = kwargs.get('initialize_port', 12222)
         self.starting_task_port = kwargs.get('starting_task_port', 12228)
-        self.max_connections = kwargs.get('connections', 20)
         self.debug = kwargs.get('debug', False)
         self.max_disconnect_errors = kwargs.get('max_disconnect_errors', 3)
 
         self.nodes = {}
+        self.max_connections = 20
         self.current_port = self.starting_task_port
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
