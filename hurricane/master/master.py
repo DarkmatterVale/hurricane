@@ -8,7 +8,7 @@ class MasterNode:
 
     def __init__(self, **kwargs):
         self.initialize_port = kwargs.get('initialize_port', 12223)
-        self.data_port = kwargs.get('data_port', 12222)
+        self.task_port = kwargs.get('task_port', 12222)
         self.max_connections = kwargs.get('connections', 20)
         self.debug = kwargs.get('debug', False)
 
@@ -36,7 +36,7 @@ class MasterNode:
 
         data = {
             "is_connected" : True,
-            "task_port" : self.data_port
+            "task_port" : self.task_port
         }
 
         while True:
@@ -82,22 +82,23 @@ class MasterNode:
             "data" : data
         }
 
-        try:
-            task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            task_socket.connect((self.hosts[0], self.data_port))
+        for host in self.hosts:
+            try:
+                task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                task_socket.connect((host, self.task_port))
 
-            if self.debug:
-                print("[*] Sending a new task to " + str(self.hosts[0]))
+                if self.debug:
+                    print("[*] Sending a new task to " + str(host))
 
-            task_socket.send(encode_data(final_data))
-            task_socket.close()
-        except socket.error as err:
-            if err.errno == errno.ECONNREFUSED:
-                if self.debug:
-                    print("[*] ERROR : Connection refused when attempting to send a task to " + self.hosts[0])
-            elif err.errno == errno.EPIPE:
-                if self.debug:
-                    print("[*] ERROR : Client connection from " + self.hosts[0] + " disconnected early")
-            else:
-                if self.debug:
-                    print("[*] ERROR : Unknown error thrown when attempting to send a task to " + self.hosts[0])
+                task_socket.send(encode_data(final_data))
+                task_socket.close()
+            except socket.error as err:
+                if err.errno == errno.ECONNREFUSED:
+                    if self.debug:
+                        print("[*] ERROR : Connection refused when attempting to send a task to " + host)
+                elif err.errno == errno.EPIPE:
+                    if self.debug:
+                        print("[*] ERROR : Client connection from " + host + " disconnected early")
+                else:
+                    if self.debug:
+                        print("[*] ERROR : Unknown error thrown when attempting to send a task to " + host)
