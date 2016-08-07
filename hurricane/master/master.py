@@ -13,8 +13,10 @@ class MasterNode:
         self.task_port = kwargs.get('task_port', 12223)
         self.max_connections = kwargs.get('connections', 20)
         self.debug = kwargs.get('debug', False)
+        self.max_disconnect_errors = kwargs.get('max_disconnect_errors', 3)
 
         self.hosts = []
+        self.host_errors = {}
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
     def initialize(self):
@@ -59,6 +61,35 @@ class MasterNode:
             new_node.extend(self.scanner_input.recv())
             self.hosts.extend([new_node[0]])
 
+    def manage_host_status(self):
+        """
+        If a host has disconnected, remove them from the known hosts list.
+        """
+        self.update_hosts()
+
+        index = 0
+        while index < len(self.hosts):
+            host = self.hosts[index]
+
+            if host not in self.host_errors:
+                self.host_errors[host] = 0
+
+            if self.host_errors[host] >= self.max_disconnect_errors:
+                if self.debug:
+                    print("[*] Connection with " + host + " has timed out...disconnecting from slave node")
+                new_hosts = []
+                new_host_errors = {}
+                for inner_host in self.hosts:
+                    if inner_host != host:
+                        new_hosts.extend([inner_host])
+                        new_host_errors[inner_host] = self.host_errors[inner_host]
+
+                self.host_errors = new_host_errors
+                self.hosts = new_hosts
+                index -= 1
+
+            index += 1
+
     def wait_for_connection(self):
         """
         Block the current thread until there is a slave node to send tasks to
@@ -67,13 +98,15 @@ class MasterNode:
             print("[*] Waiting for a connection...")
 
         while self.hosts == []:
-            self.update_hosts()
+            self.manage_host_status()
             sleep(0.1)
 
     def send_task(self, data):
         """
         Distribute a task to a slave node.
         """
+        self.manage_host_status()
+
         if self.hosts == []:
             return
 
@@ -93,7 +126,9 @@ class MasterNode:
             except socket.error as err:
                 if err.errno == errno.ECONNREFUSED:
                     if self.debug:
-                        print("[*] ERROR : Connection refused when attempting to send a task to " + host)
+                        print("[*] ERROR : Connection refused when attempting to send a task to " + host + ", try number " + str(self.host_errors[host] + 1))
+
+                    self.host_errors[host] += 1
                 elif err.errno == errno.EPIPE:
                     if self.debug:
                         print("[*] ERROR : Client connection from " + host + " disconnected early")
