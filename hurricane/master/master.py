@@ -10,13 +10,13 @@ class MasterNode:
 
     def __init__(self, **kwargs):
         self.initialize_port = kwargs.get('initialize_port', 12222)
-        self.task_port = kwargs.get('task_port', 12223)
+        self.starting_task_port = kwargs.get('starting_task_port', 12228)
         self.max_connections = kwargs.get('connections', 20)
         self.debug = kwargs.get('debug', False)
         self.max_disconnect_errors = kwargs.get('max_disconnect_errors', 3)
 
-        self.hosts = []
-        self.host_errors = {}
+        self.nodes = {}
+        self.current_port = self.starting_task_port
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
     def initialize(self):
@@ -35,60 +35,72 @@ class MasterNode:
         """
         initialize_socket = create_listen_socket(self.initialize_port, self.max_connections)
 
-        data = {
-            "is_connected" : True,
-            "task_port" : self.task_port
-        }
-
         while True:
             c, addr = initialize_socket.accept()
-
-            if self.debug:
-                print("[*] Identified new node at " + str(addr))
-
-            self.scanner_output.send(addr)
+            new_node_port = self.get_next_available_port()
+            data = {
+                "is_connected" : True,
+                "task_port" : new_node_port
+            }
+            self.scanner_output.send({"address" : addr, "task_port" : new_node_port})
 
             c.send(encode_data(data))
             c.close()
 
-    def update_hosts(self):
+    def get_next_available_port(self):
+        """
+        Return the next available port to communicate on.
+        """
+        self.current_port += 1
+
+        return self.current_port
+
+    def update_nodes(self):
         """
         Check the initialization thread pipe to see if any new clients have been
         discovered.
         """
         while self.scanner_input.poll():
             new_node = []
-            new_node.extend(self.scanner_input.recv())
-            self.hosts.extend([new_node[0]])
+            data = self.scanner_input.recv()
+            new_node.extend(data["address"])
 
-    def manage_host_status(self):
+            new_node_compiled = new_node[0] + ":" + str(data["task_port"])
+            if new_node_compiled not in self.nodes:
+                self.nodes[new_node_compiled] = {"num_disconnects" : 0}
+
+                if self.debug:
+                    print("[*] Identified new node at " + new_node_compiled)
+
+    def get_host(self, id):
+        """
+        Read the host from the id.
+        """
+        return id.split(":")[0]
+
+    def get_port(self, id):
+        """
+        Read the port from the id.
+        """
+        return id.split(":")[1]
+
+    def manage_node_status(self):
         """
         If a host has disconnected, remove them from the known hosts list.
         """
-        self.update_hosts()
+        self.update_nodes()
 
-        index = 0
-        while index < len(self.hosts):
-            host = self.hosts[index]
-
-            if host not in self.host_errors:
-                self.host_errors[host] = 0
-
-            if self.host_errors[host] >= self.max_disconnect_errors:
+        should_update = False
+        for node, node_info in self.nodes.items():
+            if node_info["num_disconnects"] >= self.max_disconnect_errors:
                 if self.debug:
-                    print("[*] Connection with " + host + " has timed out...disconnecting from slave node")
-                new_hosts = []
-                new_host_errors = {}
-                for inner_host in self.hosts:
-                    if inner_host != host:
-                        new_hosts.extend([inner_host])
-                        new_host_errors[inner_host] = self.host_errors[inner_host]
+                    print("[*] Connection with " + node + " has timed out...disconnecting from slave node")
+                new_nodes = {}
+                for inner_node, inner_node_info in self.nodes.items():
+                    if inner_node != node:
+                        new_nodes[inner_node] = inner_node_info
 
-                self.host_errors = new_host_errors
-                self.hosts = new_hosts
-                index -= 1
-
-            index += 1
+                self.nodes = new_nodes
 
     def wait_for_connection(self):
         """
@@ -97,41 +109,43 @@ class MasterNode:
         if self.debug:
             print("[*] Waiting for a connection...")
 
-        while self.hosts == []:
-            self.manage_host_status()
+        while self.nodes == {}:
+            self.manage_node_status()
             sleep(0.1)
 
     def send_task(self, data):
         """
         Distribute a task to a slave node.
         """
-        self.manage_host_status()
+        self.manage_node_status()
 
-        if self.hosts == []:
+        if self.nodes == {}:
             return
 
         final_data = {
             "data" : data
         }
 
-        for host in self.hosts:
+        for node, node_info in self.nodes.items():
             try:
-                task_socket = create_active_socket(host, self.task_port)
+                task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
 
                 if self.debug:
-                    print("[*] Sending a new task to " + str(host))
+                    print("[*] Sending a new task to " + node)
 
                 task_socket.send(encode_data(final_data))
                 task_socket.close()
+
+                self.nodes[node]["num_disconnects"] = 0
             except socket.error as err:
                 if err.errno == errno.ECONNREFUSED:
                     if self.debug:
-                        print("[*] ERROR : Connection refused when attempting to send a task to " + host + ", try number " + str(self.host_errors[host] + 1))
+                        print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(self.nodes[node]["num_disconnects"] + 1))
 
-                    self.host_errors[host] += 1
+                    self.nodes[node]["num_disconnects"] += 1
                 elif err.errno == errno.EPIPE:
                     if self.debug:
-                        print("[*] ERROR : Client connection from " + host + " disconnected early")
+                        print("[*] ERROR : Client connection from " + node + " disconnected early")
                 else:
                     if self.debug:
-                        print("[*] ERROR : Unknown error thrown when attempting to send a task to " + host)
+                        print("[*] ERROR : Unknown error thrown when attempting to send a task to " + node)
