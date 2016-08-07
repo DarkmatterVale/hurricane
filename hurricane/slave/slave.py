@@ -11,9 +11,10 @@ class SlaveNode:
 
     def __init__(self, **kwargs):
         self.debug = kwargs.get('debug', False)
-        self.task_port = kwargs.get('task_port', 12223)
         self.initialize_port = kwargs.get('initialize_port', 12222)
         self.master_node_address = kwargs.get('master_node', '')
+
+        self.task_port = self.initialize_port + 1
         self.scanning_process = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
