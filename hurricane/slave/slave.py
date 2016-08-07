@@ -9,7 +9,7 @@ class SlaveNode:
 
     def __init__(self, **kwargs):
         self.debug = kwargs.get('debug', False)
-        self.data_port = kwargs.get('data_port', 12222)
+        self.task_port = kwargs.get('task_port', 12222)
         self.initialize_port = kwargs.get('initialize_port', 12223)
         self.master_node_address = kwargs.get('master_node', '')
         self.scanning_process = None
@@ -41,7 +41,13 @@ class SlaveNode:
         @returns True if the master node has been identified, False if not
         """
         if self.scanner_input.poll():
-            self.master_node_address = self.scanner_input.recv()
+            while self.scanner_input.poll():
+                data = self.scanner_input.recv()
+                try:
+                    self.master_node_address = data["address"]
+                except:
+                    self.task_port = data["task_port"]
+
             self.scanning_process.terminate()
 
         if self.master_node_address != '':
@@ -54,11 +60,11 @@ class SlaveNode:
         Wait for a task to be sent on the data port.
         """
         self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.task_socket.bind(('', self.data_port))
+        self.task_socket.bind(('', self.task_port))
         self.task_socket.listen(1)
 
         if self.debug:
-            print("[*] Waiting to receive a task on port " + str(self.data_port))
+            print("[*] Waiting to receive a new task on port " + str(self.task_port) + "...")
 
         c, addr = self.task_socket.accept()
 
@@ -100,10 +106,13 @@ class SlaveNode:
                             print("[*] Successfully connected to " + str(address))
 
                         # Send the address of the master node to the upper thread
-                        self.scanner_output.send(address)
+                        self.scanner_output.send({"address" : address})
+
+                        if self.debug:
+                            print("[*] Updated data port to port number " + str(data["task_port"]))
 
                         # Update the data port
-                        self.data_port = data["data_port"]
+                        self.scanner_output.send({"task_port" : data["task_port"]})
 
                         return
                 except:

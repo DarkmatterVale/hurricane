@@ -1,7 +1,7 @@
 from hurricane import MasterNode
 from time import sleep
 
-server = MasterNode(debug=True)
+server = MasterNode(debug=True, data_port=12224)
 server.initialize()
 
 server.wait_for_connection()

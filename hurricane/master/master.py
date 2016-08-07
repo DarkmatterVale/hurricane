@@ -36,7 +36,7 @@ class MasterNode:
 
         data = {
             "is_connected" : True,
-            "data_port" : self.data_port
+            "task_port" : self.data_port
         }
 
         while True:
@@ -87,7 +87,7 @@ class MasterNode:
             task_socket.connect((self.hosts[0], self.data_port))
 
             if self.debug:
-                print("[*] Sending task to " + str(self.hosts[0]))
+                print("[*] Sending a new task to " + str(self.hosts[0]))
 
             task_socket.send(encode_data(final_data))
             task_socket.close()
