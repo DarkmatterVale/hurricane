@@ -66,7 +66,6 @@ class SlaveNode:
             print("[*] Received a new task from " + str(addr))
 
         data = read_data(c)
-        c.close()
 
         return data["data"]
 
@@ -84,30 +83,30 @@ class SlaveNode:
             ip_addresses = [self.master_node_address]
 
         # Identify the master node
-        for address in ip_addresses:
-            initialize_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        while True:
+            for address in ip_addresses:
+                initialize_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-            if self.debug:
-                print("[*] Attempting to connect to " + str(address) + "...")
+                if self.debug:
+                    print("[*] Attempting to connect to " + str(address) + "...")
 
-            try:
-                initialize_socket.connect((address, self.initialize_port))
-                data = read_data(initialize_socket)
-                initialize_socket.close()
+                try:
+                    initialize_socket.connect((address, self.initialize_port))
+                    data = read_data(initialize_socket)
+                    initialize_socket.close()
 
-                if data["is_connected"] == True:
-                    if self.debug:
-                        print("[*] Successfully connected to " + str(address))
+                    if data["is_connected"] == True:
+                        if self.debug:
+                            print("[*] Successfully connected to " + str(address))
 
-                    # Send the address of the master node to the upper thread
-                    self.scanner_output.send(address)
+                        # Send the address of the master node to the upper thread
+                        self.scanner_output.send(address)
 
-                    # Update the data port
-                    self.data_port = data["data_port"]
+                        # Update the data port
+                        self.data_port = data["data_port"]
 
-                    return
-            except:
-                continue
+                        return
+                except:
+                    continue
 
-        sleep(1)
-        self.complete_network_scan()
+            sleep(1)

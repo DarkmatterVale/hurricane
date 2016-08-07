@@ -9,3 +9,4 @@ while True:
     server.send_task({"name" : "server"})
     sleep(5)
     server.send_task({"name" : "server2"})
+    sleep(5)

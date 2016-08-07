@@ -30,6 +30,7 @@ class MasterNode:
         Identify slave nodes.
         """
         initialize_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        initialize_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         initialize_socket.bind(('', self.initialize_port))
         initialize_socket.listen(self.max_connections)
 
@@ -59,20 +60,6 @@ class MasterNode:
             new_node.extend(self.scanner_input.recv())
             self.hosts.extend([new_node[0]])
 
-    def send_data(self, data):
-        """
-        Send data to all hosts that have connected.
-        """
-        self.update_hosts()
-
-        c, addr = self.data_socket.accept()
-
-        if self.debug:
-            print("[*] Got connection from ", addr)
-
-        c.send(encode_data(data))
-        c.close()
-
     def wait_for_connection(self):
         """
         Block the current thread until there is a slave node to send tasks to
@@ -98,12 +85,19 @@ class MasterNode:
         try:
             task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             task_socket.connect((self.hosts[0], self.data_port))
+
+            if self.debug:
+                print("[*] Sending task to " + str(self.hosts[0]))
+
             task_socket.send(encode_data(final_data))
             task_socket.close()
         except socket.error as err:
             if err.errno == errno.ECONNREFUSED:
                 if self.debug:
                     print("[*] ERROR : Connection refused when attempting to send a task to " + self.hosts[0])
+            elif err.errno == errno.EPIPE:
+                if self.debug:
+                    print("[*] ERROR : Client connection from " + self.hosts[0] + " disconnected early")
             else:
                 if self.debug:
                     print("[*] ERROR : Unknown error thrown when attempting to send a task to " + self.hosts[0])
