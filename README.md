@@ -28,10 +28,18 @@ Clone this github repository, cd into the ```hurricane``` directory and run ```s
 
 ## External Dependencies
 
-The following must be installed externally to use this program:
+The following must be installed externally to use this program on:
+
+Mac OS X
 
 ```
 brew install libdnet
+```
+
+Windows
+
+```
+winpcap
 ```
 
 Python 3.5.x or higher must also be installed before attempting to use this library (I WILL NOT support any prior version of Python because they will eventually stop being supported).
