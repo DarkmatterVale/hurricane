@@ -7,6 +7,7 @@ def create_active_socket(host, port):
     @returns the new active socket
     """
     active_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    active_socket.settimeout(10)
     active_socket.connect((host, port))
 
     return active_socket
