@@ -7,7 +7,7 @@ if __name__ == '__main__':
 
     server.wait_for_connection()
     while True:
-        server.send_task({"name" : "server"})
-        sleep(5)
-        server.send_task({"name" : "server2"})
-        sleep(5)
+        task_id = server.send_task({"name" : "server"})
+        sleep(3)
+        task_id_2 = server.send_task({"name" : "server2"})
+        sleep(3)

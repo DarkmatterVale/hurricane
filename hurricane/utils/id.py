@@ -6,4 +6,4 @@ def generate_task_id():
     """
     new_id = uuid.uuid4()
 
-    return new_id % 10000000
+    return new_id.int % 10000000

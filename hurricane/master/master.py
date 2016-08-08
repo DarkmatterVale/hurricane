@@ -5,6 +5,7 @@ from time import sleep
 from hurricane.utils import encode_data
 from hurricane.utils import create_active_socket
 from hurricane.utils import create_listen_socket
+from hurricane.utils import generate_task_id
 
 class MasterNode:
 
@@ -121,22 +122,27 @@ class MasterNode:
         if self.nodes == {}:
             return
 
+        task_id = generate_task_id()
         final_data = {
+            "task_id" : task_id,
             "data" : data
         }
 
+        did_error_occur = False
         for node, node_info in self.nodes.items():
             try:
                 task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
 
                 if self.debug:
-                    print("[*] Sending a new task to " + node)
+                    print("[*] Sending task " + str(task_id) + " to " + node)
 
                 task_socket.send(encode_data(final_data))
                 task_socket.close()
 
                 self.nodes[node]["num_disconnects"] = 0
             except socket.error as err:
+                did_error_occur = True
+
                 if err.errno == errno.ECONNREFUSED or err.args[0] == "timed out":
                     if self.debug:
                         print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(self.nodes[node]["num_disconnects"] + 1))
@@ -148,3 +154,8 @@ class MasterNode:
                 else:
                     if self.debug:
                         print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
+
+        if not did_error_occur:
+            return task_id
+
+        return None
