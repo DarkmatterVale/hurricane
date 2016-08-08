@@ -137,7 +137,7 @@ class MasterNode:
 
                 self.nodes[node]["num_disconnects"] = 0
             except socket.error as err:
-                if err.errno == errno.ECONNREFUSED:
+                if err.errno == errno.ECONNREFUSED or err.args[0] == "timed out":
                     if self.debug:
                         print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(self.nodes[node]["num_disconnects"] + 1))
 
@@ -147,4 +147,4 @@ class MasterNode:
                         print("[*] ERROR : Client connection from " + node + " disconnected early")
                 else:
                     if self.debug:
-                        print("[*] ERROR : Unknown error thrown when attempting to send a task to " + node)
+                        print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
