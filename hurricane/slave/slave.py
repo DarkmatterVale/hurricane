@@ -82,17 +82,17 @@ class SlaveNode:
         """
         Scan the local network & determine all of the active IP addresses.
         """
-        # Scan the network (if necessary)
-        if self.master_node_address == '':
-            if self.debug:
-                print("[*] Scanning the network to identify active hosts...")
-            ip_addresses = ['127.0.0.1']
-            ip_addresses.extend(scan_network())
-        else:
-            ip_addresses = [self.master_node_address]
-
-        # Identify the master node
         while True:
+            # Scan the network (if necessary)
+            if self.master_node_address == '':
+                if self.debug:
+                    print("[*] Scanning the network to identify active hosts...")
+                ip_addresses = ['127.0.0.1']
+                ip_addresses.extend(scan_network())
+            else:
+                ip_addresses = [self.master_node_address]
+
+            # Identify the master node
             for address in ip_addresses:
                 if self.debug:
                     print("[*] Attempting to connect to " + str(address) + "...")

@@ -1,10 +1,11 @@
 from hurricane import SlaveNode
 
-client = SlaveNode(debug=True, master_node='127.0.0.1')
+if __name__ == '__main__':
+    client = SlaveNode(debug=True)#, master_node='192.168.1.2')#'127.0.0.1')
 
-client.initialize()
-client.wait_for_initialize()
+    client.initialize()
+    client.wait_for_initialize()
 
-while True:
-    task = client.wait_for_task()
-    print("[*] Task name: " + str(task["name"]))
+    while True:
+        task = client.wait_for_task()
+        print("[*] Task name: " + str(task["name"]))

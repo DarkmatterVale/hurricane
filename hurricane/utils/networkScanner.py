@@ -1,4 +1,9 @@
 from __future__ import absolute_import, division, print_function
+
+import sys
+if "win" in sys.platform:
+    from scapy.all import *
+
 import scapy.config
 import scapy.layers.l2
 import scapy.route
@@ -43,7 +48,7 @@ def to_CIDR_notation(bytes_network, bytes_netmask):
 
     return net
 
-def scan_and_print_neighbors(net, interface, timeout=0.1):
+def scan_and_print_neighbors(net, interface, timeout=50):
     addresses = []
 
     try:

@@ -1,12 +1,13 @@
 from hurricane import MasterNode
 from time import sleep
 
-server = MasterNode(debug=True, starting_task_port=12228)
-server.initialize()
+if __name__ == '__main__':
+    server = MasterNode(debug=True, starting_task_port=12228)
+    server.initialize()
 
-server.wait_for_connection()
-while True:
-    server.send_task({"name" : "server"})
-    sleep(5)
-    server.send_task({"name" : "server2"})
-    sleep(5)
+    server.wait_for_connection()
+    while True:
+        server.send_task({"name" : "server"})
+        sleep(5)
+        server.send_task({"name" : "server2"})
+        sleep(5)
