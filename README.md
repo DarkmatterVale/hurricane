@@ -48,8 +48,6 @@ Python 3.5.x or higher must also be installed before attempting to use this libr
 
 hurricane is broken into two main classes, ```hurricane.MasterNode``` and ```hurricane.SlaveNode```. The following examples demonstrate a simple program to communicate between a master node and multiple slave nodes.
 
-```hurricane.MasterNode```
-
 When creating a master node, this is the class that is used. Here is a simple example of a MasterNode being used:
 
 ```
