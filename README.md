@@ -91,7 +91,7 @@ In this example, a slave node is configured to enable debugging as well as manua
 - ```initialize_port``` : This is the port number used during initial communication with the master node of a hurricane cluster. As mentioned in the documentation for the MasterNode class, this must be the same as the master node's initialization_port. By default, this is set to ```12222```
 - ```master_node``` : By setting the master node's address, you are changing a number of "behind-the-scenes" settings. First off, setting this parameter dramatically decreases the execution time of initialization of the slave node. When this parameter is not set, the node's auto-discover feature is enabled which requires the program to scan the local network for a master node. This scanning process will continue infinitely until a master node is found (it DOES take a significant portion of CPU power). Once the master node has been identified, the node resumes "normal" execution. It is also important to note that this is NOT a blocking operation, as in it is run in a separate thread to ensure the program maintaining the slave node is not stopped. By default, the master node's address is not set
 
-Please see the documentation for in-depth information in using the hurricane library.
+Please see the documentation for in-depth information on using the hurricane library.
 
 ## Examples
 
