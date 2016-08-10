@@ -3,6 +3,7 @@ import errno
 import multiprocessing
 from time import sleep
 from hurricane.utils import scan_network
+from hurricane.utils import simple_scan_network
 from hurricane.utils import read_data
 from hurricane.utils import create_active_socket
 from hurricane.utils import create_listen_socket
@@ -87,8 +88,7 @@ class SlaveNode:
             if self.master_node_address == '':
                 if self.debug:
                     print("[*] Scanning the network to identify active hosts...")
-                ip_addresses = ['127.0.0.1']
-                ip_addresses.extend(scan_network())
+                ip_addresses = simple_scan_network()
             else:
                 ip_addresses = [self.master_node_address]
 

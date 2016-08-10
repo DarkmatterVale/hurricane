@@ -10,13 +10,26 @@ import scapy.route
 import socket
 import math
 
+def simple_scan_network():
+    """
+    Do a simple network scan, which only works if your network configuration
+    is 192.168.1.x
+    """
+    base_ip = "192.168.1."
+    addresses = ['127.0.0.1']
+
+    for index in range(1, 255):
+        addresses.extend([base_ip + str(index)])
+
+    return addresses
+
 def scan_network():
     """
     Scan the LAN and identify active IP addressses.
 
     @returns the list of active IP addresses
     """
-    ip_addresses = []
+    ip_addresses = ['127.0.0.1']
 
     for network, netmask, _, interface, address in scapy.config.conf.route.routes:
         # skip loopback network and default gw
