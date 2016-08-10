@@ -65,12 +65,10 @@ while True:
 
 When instantiating a MasterNode object, there are a number of settings which can be configured:
 
-```debug``` : This can be set to either ```True``` or ```False```. If it is set to ```True``` debugging is enabled, and thorough logging is displayed to the console. By default, this option is set to ```False```
-```initialize_port``` : This is the "unique identifier" for a hurricane cluster. The default port is ```12222```, but it can be changed to almost all ports. For example, to set the initialize_port to port number 13456 add the option ```initialize_port=13456```. It is very important to note that the initialize port must be the same on both the master and slave nodes of a hurricane cluster. If they are not, a slave node will not be able to connect to the master node
-```starting_task_port``` : By default, this port is set to one above the initialization port. You can manually set it to any port, and all ports above this port will be allowed to be used by the hurricane cluster to communicate with nodes
-```max_disconnect_errors``` : This is the number of times the server will attempt to connect to a malfunctioning node of the cluster. By default, it is set to ```3```
-
-The other class that you will need to interface with is ```hurricane.SlaveNode```
+- ```debug``` : This can be set to either ```True``` or ```False```. If it is set to ```True``` debugging is enabled, and thorough logging is displayed to the console. By default, this option is set to ```False```
+- ```initialize_port``` : This is the "unique identifier" for a hurricane cluster. The default port is ```12222```, but it can be changed to almost all ports. For example, to set the initialize_port to port number 13456 add the option - ```initialize_port=13456```. It is very important to note that the initialize port must be the same on both the master and slave nodes of a hurricane cluster. If they are not, a slave node will not be able to connect to the master node
+- ```starting_task_port``` : By default, this port is set to one above the initialization port. You can manually set it to any port, and all ports above this port will be allowed to be used by the hurricane cluster to communicate with nodes
+- ```max_disconnect_errors``` : This is the number of times the server will attempt to connect to a malfunctioning node of the cluster. By default, it is set to ```3```
 
 Here is a simple slave node:
 
@@ -89,9 +87,9 @@ while True:
 
 In this example, a slave node is configured to enable debugging as well as manually setting the address for the master node to ```127.0.0.1```. Below are all of the options that can be configured when instantiating a slave node.
 
-```debug``` : This can be set to either ```True``` or ```False```. If it is set to ```True``` debugging is enabled, and thorough logging is displayed to the console. This option is defaulted to ```False```
-```initialize_port``` : This is the port number used during initial communication with the master node of a hurricane cluster. As mentioned in the documentation for the MasterNode class, this must be the same as the master node's initialization_port. By default, this is set to ```12222```
-```master_node``` : By setting the master node's address, you are changing a number of "behind-the-scenes" settings. First off, setting this parameter dramatically decreases the execution time of initialization of the slave node. When this parameter is not set, the node's auto-discover feature is enabled which requires the program to scan the local network for a master node. This scanning process will continue infinitely until a master node is found (it DOES take a significant portion of CPU power). Once the master node has been identified, the node resumes "normal" execution. It is also important to note that this is NOT a blocking operation, as in it is run in a separate thread to ensure the program maintaining the slave node is not stopped. By default, the master node's address is not set
+- ```debug``` : This can be set to either ```True``` or ```False```. If it is set to ```True``` debugging is enabled, and thorough logging is displayed to the console. This option is defaulted to ```False```
+- ```initialize_port``` : This is the port number used during initial communication with the master node of a hurricane cluster. As mentioned in the documentation for the MasterNode class, this must be the same as the master node's initialization_port. By default, this is set to ```12222```
+- ```master_node``` : By setting the master node's address, you are changing a number of "behind-the-scenes" settings. First off, setting this parameter dramatically decreases the execution time of initialization of the slave node. When this parameter is not set, the node's auto-discover feature is enabled which requires the program to scan the local network for a master node. This scanning process will continue infinitely until a master node is found (it DOES take a significant portion of CPU power). Once the master node has been identified, the node resumes "normal" execution. It is also important to note that this is NOT a blocking operation, as in it is run in a separate thread to ensure the program maintaining the slave node is not stopped. By default, the master node's address is not set
 
 Please see the documentation for in-depth information in using the hurricane library.
 
