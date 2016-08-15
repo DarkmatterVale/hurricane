@@ -7,6 +7,7 @@ from hurricane.utils import simple_scan_network
 from hurricane.utils import read_data
 from hurricane.utils import create_active_socket
 from hurricane.utils import create_listen_socket
+from hurricane.utils import encode_data
 
 class SlaveNode:
 
@@ -16,6 +17,7 @@ class SlaveNode:
         self.master_node_address = kwargs.get('master_node', '')
 
         self.task_port = self.initialize_port + 1
+        self.task_completion_port = self.task_port + 1
         self.scanning_process = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
@@ -51,6 +53,7 @@ class SlaveNode:
                     self.master_node_address = data["address"]
                 except:
                     self.task_port = data["task_port"]
+                    self.task_completion_port = data["task_completion_port"]
 
             self.scanning_process.terminate()
 
@@ -63,21 +66,32 @@ class SlaveNode:
         """
         Wait for a task to be sent on the data port.
         """
-        self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.task_socket.bind(('', self.task_port))
-        self.task_socket.listen(1)
 
-        if self.debug:
-            print("[*] Waiting to receive a new task on port " + str(self.task_port) + "...")
+        while True:
+            try:
+                self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.task_socket.bind(('', self.task_port))
+                self.task_socket.listen(1)
 
-        c, addr = self.task_socket.accept()
+                if self.debug:
+                    print("[*] Waiting to receive a new task on port " + str(self.task_port) + "...")
 
-        if self.debug:
-            print("[*] Received a new task from " + str(addr))
+                c, addr = self.task_socket.accept()
 
-        data = read_data(c)
+                if self.debug:
+                    print("[*] Received a new task from " + str(addr))
 
-        return data["data"]
+                data = read_data(c)
+                return data["data"]
+            except:
+                sleep(0.5)
+
+    def finish_task(self, **kwargs):
+        """
+        Send the task completion data back to the master node.
+        """
+        completion_socket = create_active_socket(self.master_node_address, self.task_completion_port)
+        completion_socket.send(encode_data({"generated_data" : kwargs.get('generated_data', None)}))
 
     def complete_network_scan(self):
         """
@@ -113,7 +127,7 @@ class SlaveNode:
                             print("[*] Updated data port to port number " + str(data["task_port"]))
 
                         # Update the data port
-                        self.scanner_output.send({"task_port" : data["task_port"]})
+                        self.scanner_output.send({"task_port" : data["task_port"], "task_completion_port" : data["task_completion_port"]})
 
                         return
                 except:

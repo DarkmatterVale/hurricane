@@ -2,7 +2,9 @@ import socket
 import multiprocessing
 import errno
 from time import sleep
+from datetime import datetime
 from hurricane.utils import encode_data
+from hurricane.utils import read_data
 from hurricane.utils import create_active_socket
 from hurricane.utils import create_listen_socket
 from hurricane.utils import generate_task_id
@@ -11,7 +13,8 @@ class MasterNode:
 
     def __init__(self, **kwargs):
         self.initialize_port = kwargs.get('initialize_port', 12222)
-        self.current_port = kwargs.get('starting_task_port', self.initialize_port + 1)
+        self.current_port = kwargs.get('starting_task_port', self.initialize_port + 2)
+        self.task_completion_port = kwargs.get('task_completion_port', self.initialize_port + 1)
         self.debug = kwargs.get('debug', False)
         self.max_disconnect_errors = kwargs.get('max_disconnect_errors', 3)
 
@@ -25,9 +28,16 @@ class MasterNode:
         """
         if self.debug:
             print("[*] Initializing the master node...")
+            print("[*] Starting up scanning process...")
         self.scanning_process = multiprocessing.Process(target=self.identify_slaves)
         self.scanning_process.daemon = True
         self.scanning_process.start()
+
+        if self.debug:
+            print("[*] Starting up task completion monitoring process...")
+        self.task_completion_monitoring_process = multiprocessing.Process(target=self.complete_tasks)
+        self.task_completion_monitoring_process.daemon = True
+        self.task_completion_monitoring_process.start()
 
     def identify_slaves(self):
         """
@@ -37,23 +47,38 @@ class MasterNode:
 
         while True:
             c, addr = initialize_socket.accept()
-            new_node_port = self.get_next_available_port()
+            self.update_available_ports()
             data = {
                 "is_connected" : True,
-                "task_port" : new_node_port
+                "task_port" : self.current_port,
+                "task_completion_port" : self.task_completion_port
             }
-            self.scanner_output.send({"address" : addr, "task_port" : new_node_port})
+            self.scanner_output.send({"address" : addr, "task_port" : self.current_port})
 
             c.send(encode_data(data))
             c.close()
 
-    def get_next_available_port(self):
+    def complete_tasks(self):
         """
-        Return the next available port to communicate on.
+        Capture the data received data when a task is completed.
+        """
+        data_socket = create_listen_socket(self.task_completion_port, self.max_connections)
+
+        while True:
+            c, addr = data_socket.accept()
+            data = read_data(c)
+            c.close()
+
+            if self.debug:
+                print("[*] Completed a task and received the following data: ")
+
+            print(data)
+
+    def update_available_ports(self):
+        """
+        Update to get next available port to communicate on.
         """
         self.current_port += 1
-
-        return self.current_port
 
     def update_nodes(self):
         """
@@ -124,7 +149,9 @@ class MasterNode:
 
         task_id = generate_task_id()
         final_data = {
+            "start_time" : datetime.now(),
             "task_id" : task_id,
+            "return_port" : self.task_completion_port,
             "data" : data
         }
 
