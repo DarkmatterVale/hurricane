@@ -8,6 +8,7 @@ from hurricane.utils import read_data
 from hurricane.utils import create_active_socket
 from hurricane.utils import create_listen_socket
 from hurricane.utils import generate_task_id
+from hurricane.utils import Task
 
 class MasterNode:
 
@@ -143,27 +144,19 @@ class MasterNode:
         Distribute a task to a slave node.
         """
         self.manage_node_status()
-
         if self.nodes == {}:
             return
 
-        task_id = generate_task_id()
-        final_data = {
-            "start_time" : datetime.now(),
-            "task_id" : task_id,
-            "return_port" : self.task_completion_port,
-            "data" : data
-        }
-
+        new_task = Task(task_id=generate_task_id(), return_port=self.task_completion_port, data=data)
         did_error_occur = False
         for node, node_info in self.nodes.items():
             try:
                 task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
 
                 if self.debug:
-                    print("[*] Sending task " + str(task_id) + " to " + node)
+                    print("[*] Sending task " + str(new_task.get_task_id()) + " to " + node)
 
-                task_socket.send(encode_data(final_data))
+                task_socket.send(encode_data(new_task))
                 task_socket.close()
 
                 self.nodes[node]["num_disconnects"] = 0
@@ -183,6 +176,6 @@ class MasterNode:
                         print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
 
         if not did_error_occur:
-            return task_id
+            return new_task.get_task_id()
 
         return None

@@ -8,6 +8,7 @@ from hurricane.utils import read_data
 from hurricane.utils import create_active_socket
 from hurricane.utils import create_listen_socket
 from hurricane.utils import encode_data
+from hurricane.utils import Task
 
 class SlaveNode:
 
@@ -81,8 +82,8 @@ class SlaveNode:
                 if self.debug:
                     print("[*] Received a new task from " + str(addr))
 
-                data = read_data(c)
-                return data["data"]
+                task = read_data(c)
+                return task.get_data()
             except:
                 sleep(0.5)
 
