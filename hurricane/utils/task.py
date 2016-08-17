@@ -8,6 +8,20 @@ class Task:
         self.task_id = kwargs.get('task_id', None)
         self.data = kwargs.get('data', None)
 
+        self.generated_data = None
+
+    def get_generated_data(self):
+        """
+        Return the generated data for this task.
+        """
+        return self.generated_data
+
+    def set_generated_data(self, generated_data):
+        """
+        Set the generated data for this task.
+        """
+        self.generated_data = generated_data
+
     def get_starttime(self):
         """
         Return the start time for this task.

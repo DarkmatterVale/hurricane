@@ -20,6 +20,7 @@ class SlaveNode:
         self.task_port = self.initialize_port + 1
         self.task_completion_port = self.task_port + 1
         self.scanning_process = None
+        self.current_task = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
     def initialize(self):
@@ -82,8 +83,8 @@ class SlaveNode:
                 if self.debug:
                     print("[*] Received a new task from " + str(addr))
 
-                task = read_data(c)
-                return task.get_data()
+                self.current_task = read_data(c)
+                return self.current_task.get_data()
             except:
                 sleep(0.5)
 
@@ -91,8 +92,17 @@ class SlaveNode:
         """
         Send the task completion data back to the master node.
         """
-        completion_socket = create_active_socket(self.master_node_address, self.task_completion_port)
-        completion_socket.send(encode_data({"generated_data" : kwargs.get('generated_data', None)}))
+        if self.current_task != None:
+            if self.debug:
+                print("[*] Completed task " + str(self.current_task.get_task_id()))
+
+            self.current_task.set_generated_data(kwargs.get('generated_data', None))
+
+            completion_socket = create_active_socket(self.master_node_address, self.task_completion_port)
+            completion_socket.send(encode_data(self.current_task))
+        else:
+            if self.debug:
+                print("[*] ERROR : No task to complete")
 
     def complete_network_scan(self):
         """

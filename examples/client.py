@@ -7,6 +7,6 @@ if __name__ == '__main__':
     client.wait_for_initialize()
 
     while True:
-        task = client.wait_for_task()
-        print("[*] Task name: " + str(task["name"]))
-        client.finish_task(generated_data=task)
+        task_data = client.wait_for_task()
+        print("[*] Task name: " + str(task_data["name"]))
+        client.finish_task(generated_data=task_data)

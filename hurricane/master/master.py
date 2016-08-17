@@ -1,6 +1,7 @@
 import socket
 import multiprocessing
 import errno
+from queue import Empty
 from time import sleep
 from datetime import datetime
 from hurricane.utils import encode_data
@@ -22,6 +23,8 @@ class MasterNode:
         self.nodes = {}
         self.max_connections = 20
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
+        self.completed_tasks_queue = multiprocessing.Queue()
+        self.completed_tasks = []
 
     def initialize(self):
         """
@@ -67,13 +70,50 @@ class MasterNode:
 
         while True:
             c, addr = data_socket.accept()
-            data = read_data(c)
+            completed_task = read_data(c)
             c.close()
 
             if self.debug:
-                print("[*] Completed a task and received the following data: ")
+                print("[*] Completed task " + str(completed_task.get_task_id()) + " and received the following data: " + str(completed_task.get_generated_data()))
 
-            print(data)
+            self.completed_tasks_queue.put(completed_task)
+
+    def update_completed_tasks_list(self):
+        """
+        Move all tasks in queue to completed tasks list.
+        """
+        while True:
+            try:
+                self.completed_tasks.append(self.completed_tasks_queue.get(block=False))
+            except Empty:
+                break
+
+    def is_task_completed(self, task_id):
+        """
+        Returns "True, generated_data" if the task has been completed,
+        "False, None" if it has not.
+        """
+        self.update_completed_tasks_list()
+
+        for task in self.completed_tasks:
+            if task_id == task.get_task_id():
+                return True, task.get_generated_data()
+
+        return False, None
+
+    def wait_for_task_to_be_completed(self, task_id):
+        """
+        Wait for the task with task_id to be completed.
+        """
+        if self.debug:
+            print("[*] Waiting for task " + str(task_id) + " to be completed")
+
+        while True:
+            completed, data = self.is_task_completed(task_id)
+            if completed:
+                return data
+            else:
+                sleep(0.1)
 
     def update_available_ports(self):
         """
