@@ -4,12 +4,7 @@ import errno
 from queue import Empty
 from time import sleep
 from datetime import datetime
-from hurricane.utils import encode_data
-from hurricane.utils import read_data
-from hurricane.utils import create_active_socket
-from hurricane.utils import create_listen_socket
-from hurricane.utils import generate_task_id
-from hurricane.utils import Task
+from hurricane.utils import *
 
 class MasterNode:
 
@@ -50,17 +45,12 @@ class MasterNode:
         initialize_socket = create_listen_socket(self.initialize_port, self.max_connections)
 
         while True:
-            c, addr = initialize_socket.accept()
+            connection, addr = initialize_socket.accept()
             self.update_available_ports()
-            data = {
-                "is_connected" : True,
-                "task_port" : self.current_port,
-                "task_completion_port" : self.task_completion_port
-            }
-            self.scanner_output.send({"address" : addr, "task_port" : self.current_port})
 
-            c.send(encode_data(data))
-            c.close()
+            self.scanner_output.send({"address" : addr, "task_port" : self.current_port})
+            connection.send(encode_data(InitializeMessage(task_port=self.current_port, task_completion_port=self.task_completion_port)))
+            connection.close()
 
     def complete_tasks(self):
         """
@@ -74,7 +64,7 @@ class MasterNode:
             c.close()
 
             if self.debug:
-                print("[*] Completed task " + str(completed_task.get_task_id()) + " and received the following data: " + str(completed_task.get_generated_data()))
+                print("[*] Completed task " + str(completed_task.get_task_id()))
 
             self.completed_tasks_queue.put(completed_task)
 
@@ -114,6 +104,8 @@ class MasterNode:
                 return data
             else:
                 sleep(0.1)
+
+        return None
 
     def update_available_ports(self):
         """

@@ -8,8 +8,10 @@ if __name__ == '__main__':
     server.wait_for_connection()
     while True:
         task_id = server.send_task({"name" : "server"})
-        server.wait_for_task_to_be_completed(task_id)
+        generated_data = server.wait_for_task_to_be_completed(task_id)
+        print(generated_data)
         sleep(3)
         task_id_2 = server.send_task({"name" : "server2"})
-        server.wait_for_task_to_be_completed(task_id_2)
+        generated_data_2 = server.wait_for_task_to_be_completed(task_id_2)
+        print(generated_data_2)
         sleep(3)

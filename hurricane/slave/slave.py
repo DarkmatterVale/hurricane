@@ -2,13 +2,7 @@ import socket
 import errno
 import multiprocessing
 from time import sleep
-from hurricane.utils import scan_network
-from hurricane.utils import simple_scan_network
-from hurricane.utils import read_data
-from hurricane.utils import create_active_socket
-from hurricane.utils import create_listen_socket
-from hurricane.utils import encode_data
-from hurricane.utils import Task
+from hurricane.utils import *
 
 class SlaveNode:
 
@@ -54,8 +48,8 @@ class SlaveNode:
                 try:
                     self.master_node_address = data["address"]
                 except:
-                    self.task_port = data["task_port"]
-                    self.task_completion_port = data["task_completion_port"]
+                    self.task_port = data.get_task_port()
+                    self.task_completion_port = data.get_task_completion_port()
 
             self.scanning_process.terminate()
 
@@ -122,26 +116,25 @@ class SlaveNode:
                 if self.debug:
                     print("[*] Attempting to connect to " + str(address) + "...")
 
-                try:
-                    initialize_socket = create_active_socket(address, self.initialize_port)
-                    data = read_data(initialize_socket)
-                    initialize_socket.close()
+                #try:
+                initialize_socket = create_active_socket(address, self.initialize_port)
+                data = read_data(initialize_socket)
+                initialize_socket.close()
 
-                    if data["is_connected"] == True:
-                        if self.debug:
-                            print("[*] Successfully connected to " + str(address))
+                if self.debug:
+                    print("[*] Successfully connected to " + str(address))
 
-                        # Send the address of the master node to the upper thread
-                        self.scanner_output.send({"address" : address})
+                # Send the address of the master node to the parent thread
+                self.scanner_output.send({"address" : address})
 
-                        if self.debug:
-                            print("[*] Updated data port to port number " + str(data["task_port"]))
+                if self.debug:
+                    print("[*] Updated data port to port number " + str(data.get_task_port()))
 
-                        # Update the data port
-                        self.scanner_output.send({"task_port" : data["task_port"], "task_completion_port" : data["task_completion_port"]})
+                # Update the data port
+                self.scanner_output.send(data)
 
-                        return
-                except:
-                    continue
+                return
+                #except:
+                #    continue
 
             sleep(1)

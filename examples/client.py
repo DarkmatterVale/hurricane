@@ -9,4 +9,4 @@ if __name__ == '__main__':
     while True:
         task_data = client.wait_for_task()
         print("[*] Task name: " + str(task_data["name"]))
-        client.finish_task(generated_data=task_data)
+        client.finish_task(generated_data={"completion_status" : "success"})
