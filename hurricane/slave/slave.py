@@ -116,25 +116,25 @@ class SlaveNode:
                 if self.debug:
                     print("[*] Attempting to connect to " + str(address) + "...")
 
-                #try:
-                initialize_socket = create_active_socket(address, self.initialize_port)
-                data = read_data(initialize_socket)
-                initialize_socket.close()
+                try:
+                    initialize_socket = create_active_socket(address, self.initialize_port)
+                    data = read_data(initialize_socket)
+                    initialize_socket.close()
 
-                if self.debug:
-                    print("[*] Successfully connected to " + str(address))
+                    if self.debug:
+                        print("[*] Successfully connected to " + str(address))
 
-                # Send the address of the master node to the parent thread
-                self.scanner_output.send({"address" : address})
+                    # Send the address of the master node to the parent thread
+                    self.scanner_output.send({"address" : address})
 
-                if self.debug:
-                    print("[*] Updated data port to port number " + str(data.get_task_port()))
+                    if self.debug:
+                        print("[*] Updated data port to port number " + str(data.get_task_port()))
 
-                # Update the data port
-                self.scanner_output.send(data)
+                    # Update the data port
+                    self.scanner_output.send(data)
 
-                return
-                #except:
-                #    continue
+                    return
+                except:
+                    continue
 
             sleep(1)
