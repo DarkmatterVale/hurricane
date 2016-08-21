@@ -42,7 +42,7 @@ Windows
 winpcap
 ```
 
-Python 3.5.x or higher must also be installed before attempting to use this library (I WILL NOT support any prior version of Python because they will eventually stop being supported).
+Python 3.5.x or higher must also be installed before attempting to use this library (I WILL NOT support any prior version of Python such as 2.7 because they will eventually stop being updated in 2020).
 
 ## Usage
 
@@ -67,7 +67,6 @@ When instantiating a MasterNode object, there are a number of settings which can
 
 - ```debug``` : This can be set to either ```True``` or ```False```. If it is set to ```True``` debugging is enabled, and thorough logging is displayed to the console. By default, this option is set to ```False```
 - ```initialize_port``` : This is the "unique identifier" for a hurricane cluster. The default port is ```12222```, but it can be changed to almost all ports. For example, to set the initialize_port to port number 13456 add the option - ```initialize_port=13456```. It is very important to note that the initialize port must be the same on both the master and slave nodes of a hurricane cluster. If they are not, a slave node will not be able to connect to the master node
-- ```starting_task_port``` : By default, this port is set to one above the initialization port. You can manually set it to any port, and all ports above this port will be allowed to be used by the hurricane cluster to communicate with nodes
 - ```max_disconnect_errors``` : This is the number of times the server will attempt to connect to a malfunctioning node of the cluster. By default, it is set to ```3```
 
 Here is a simple slave node:
