@@ -10,13 +10,13 @@ class MasterNode:
 
     def __init__(self, **kwargs):
         self.initialize_port = kwargs.get('initialize_port', 12222)
-        self.current_port = kwargs.get('starting_task_port', self.initialize_port + 2)
-        self.task_completion_port = kwargs.get('task_completion_port', self.initialize_port + 1)
         self.debug = kwargs.get('debug', False)
         self.max_disconnect_errors = kwargs.get('max_disconnect_errors', 3)
 
         self.nodes = {}
         self.max_connections = 20
+        self.task_completion_port = self.initialize_port + 1
+        self.current_port = self.initialize_port + 2
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
         self.completed_tasks_queue = multiprocessing.Queue()
         self.completed_tasks = []
