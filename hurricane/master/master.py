@@ -91,19 +91,35 @@ class MasterNode:
 
         return False, None
 
-    def wait_for_task_to_be_completed(self, task_id):
+    def wait_for_task_to_be_completed(self, task_id, timeout=-1):
         """
         Wait for the task with task_id to be completed.
         """
+        if self.nodes == {}:
+            if self.debug:
+                print("[*] ERROR : No nodes are connected and no tasks can be completed")
+
+            return None
+
         if self.debug:
             print("[*] Waiting for task " + str(task_id) + " to be completed")
 
-        while True:
-            completed, data = self.is_task_completed(task_id)
-            if completed:
-                return data
-            else:
-                sleep(0.1)
+        if timeout > 0:
+            time = 0
+            while time < timeout:
+                completed, data = self.is_task_completed(task_id)
+                if completed:
+                    return data
+                else:
+                    sleep(0.1)
+                    time += 0.1
+        else:
+            while True:
+                completed, data = self.is_task_completed(task_id)
+                if completed:
+                    return data
+                else:
+                    sleep(0.1)
 
         return None
 
@@ -186,6 +202,9 @@ class MasterNode:
         """
         self.manage_node_status()
         if self.nodes == {}:
+            if self.debug:
+                print("[*] ERROR : No nodes are connected to send a task to")
+
             return
 
         new_task = Task(task_id=generate_task_id(), return_port=self.task_completion_port, data=data)
