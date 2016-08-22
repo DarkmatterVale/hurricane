@@ -15,28 +15,36 @@ class MasterNode:
 
         self.nodes = {}
         self.max_connections = 20
-        self.task_completion_port = self.initialize_port + 1
-        self.current_port = self.initialize_port + 2
-        self.scanner_input, self.scanner_output= multiprocessing.Pipe()
+        self.task_port = self.initialize_port + 1
+        self.task_completion_port = self.initialize_port + 2
+        self.scanner_input, self.scanner_output = multiprocessing.Pipe()
         self.completed_tasks_queue = multiprocessing.Queue()
         self.completed_tasks = []
+        self.send_tasks_queue = multiprocessing.Queue()
 
     def initialize(self):
         """
         This method runs in the background and attempts to identify slaves to use.
         """
         if self.debug:
-            print("[*] Initializing the master node...")
-            print("[*] Starting up scanning process...")
+            print("[*] Initializing the master node")
+            print("[*] Starting scanning process...")
         self.scanning_process = multiprocessing.Process(target=self.identify_slaves)
-        self.scanning_process.daemon = True
         self.scanning_process.start()
 
         if self.debug:
-            print("[*] Starting up task completion monitoring process...")
-        self.task_completion_monitoring_process = multiprocessing.Process(target=self.complete_tasks)
-        self.task_completion_monitoring_process.daemon = True
-        self.task_completion_monitoring_process.start()
+            print("[*] Starting node management process...")
+        self.node_management_process = multiprocessing.Process(target=self.node_manager)
+        self.node_management_process.daemon = True
+        self.node_management_process.start()
+
+    def node_manager(self):
+        """
+        This is the main node manager process. All of the task distribution as well
+        as node "maintenance" is completed within this thread.
+        """
+        while True:
+            sleep(0.1)
 
     def identify_slaves(self):
         """
@@ -48,15 +56,23 @@ class MasterNode:
             connection, addr = initialize_socket.accept()
             self.update_available_ports()
 
-            self.scanner_output.send({"address" : addr, "task_port" : self.current_port})
-            connection.send(encode_data(InitializeMessage(task_port=self.current_port, task_completion_port=self.task_completion_port)))
+            self.scanner_output.send({"address" : addr, "task_port" : self.task_port, "task_completion_port" : self.task_completion_port})
+
+            print("TASK PORT: " + str(self.task_port))
+            print("TASK COMPLETION PORT: " + str(self.task_completion_port))
+            task_completion_monitoring_process = multiprocessing.Process(target=self.complete_tasks, args=(self.task_completion_port,))
+            task_completion_monitoring_process.daemon = True
+            task_completion_monitoring_process.start()
+            sleep(0.01)
+
+            connection.send(encode_data(InitializeMessage(task_port=self.task_port, task_completion_port=self.task_completion_port)))
             connection.close()
 
-    def complete_tasks(self):
+    def complete_tasks(self, port):
         """
         Capture the data received data when a task is completed.
         """
-        data_socket = create_listen_socket(self.task_completion_port, self.max_connections)
+        data_socket = create_listen_socket(port, self.max_connections)
 
         while True:
             c, addr = data_socket.accept()
@@ -64,7 +80,7 @@ class MasterNode:
             c.close()
 
             if self.debug:
-                print("[*] Completed task " + str(completed_task.get_task_id()))
+                print("[*] Received task completion for task " + str(completed_task.get_task_id()))
 
             self.completed_tasks_queue.put(completed_task)
 
@@ -127,24 +143,8 @@ class MasterNode:
         """
         Update to get next available port to communicate on.
         """
-        self.current_port += 1
-
-    def update_nodes(self):
-        """
-        Check the initialization thread pipe to see if any new clients have been
-        discovered.
-        """
-        while self.scanner_input.poll():
-            new_node = []
-            data = self.scanner_input.recv()
-            new_node.extend(data["address"])
-
-            new_node_compiled = new_node[0] + ":" + str(data["task_port"])
-            if new_node_compiled not in self.nodes:
-                self.nodes[new_node_compiled] = {"num_disconnects" : 0}
-
-                if self.debug:
-                    print("[*] Identified new node at " + new_node_compiled)
+        self.task_port += 2
+        self.task_completion_port += 2
 
     def get_host(self, id):
         """
@@ -162,7 +162,17 @@ class MasterNode:
         """
         If a host has disconnected, remove them from the known hosts list.
         """
-        self.update_nodes()
+        while self.scanner_input.poll():
+            new_node = []
+            data = self.scanner_input.recv()
+            new_node.extend(data["address"])
+
+            new_node_compiled = new_node[0] + ":" + str(data["task_port"])
+            if new_node_compiled not in self.nodes:
+                self.nodes[new_node_compiled] = {"num_disconnects" : 0}
+
+                if self.debug:
+                    print("[*] Identified new node at " + new_node_compiled)
 
         should_update = False
         for node, node_info in self.nodes.items():
