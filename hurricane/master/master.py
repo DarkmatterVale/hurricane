@@ -160,16 +160,25 @@ class MasterNode:
 
                 self.nodes = new_nodes
 
-    def wait_for_connection(self):
+    def wait_for_connection(self, timeout=-1):
         """
         Block the current thread until there is a slave node to send tasks to
         """
         if self.debug:
             print("[*] Waiting for a connection...")
 
-        while self.nodes == {}:
-            self.manage_node_status()
-            sleep(0.1)
+        if timeout > 0:
+            time = 0
+            while self.nodes == {} and time < timeout:
+                self.manage_node_status()
+
+                sleep(0.1)
+                time += 0.1
+        else:
+            while self.nodes == {}:
+                self.manage_node_status()
+
+                sleep(0.1)
 
     def send_task(self, data):
         """
