@@ -39,21 +39,6 @@ class MasterNode:
         self.node_management_process.daemon = True
         self.node_management_process.start()
 
-        if self.debug:
-            print("[*] Starting backup kill process...")
-        self.backup_kill_process = multiprocessing.Process(target=self.quit)
-        self.backup_kill_process.start()
-
-    def quit(self):
-        """
-        Quits the program if control-c is pressed by the user.
-        """
-        try:
-            while True:
-                sleep(0.05)
-        except:
-            sys.exit()
-
     def node_manager(self):
         """
         This is the main node manager process. All of the task distribution as well
