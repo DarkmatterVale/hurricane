@@ -19,6 +19,7 @@ class MasterNode:
         self.task_completion_port = self.initialize_port + 2
         self.scanner_input, self.scanner_output = multiprocessing.Pipe()
         self.has_connection_input, self.has_connection_output = multiprocessing.Pipe()
+        self.completed_tasks_input, self.completed_tasks_output = multiprocessing.Pipe()
         self.has_connection_tf = False
         self.completed_tasks_queue = multiprocessing.Queue()
         self.completed_tasks = []
@@ -50,6 +51,14 @@ class MasterNode:
         while True:
             nodes = self.manage_node_status(nodes)
 
+            while self.completed_tasks_input.poll():
+                task_id = self.completed_tasks_input.recv()
+
+                for node in nodes:
+                    if nodes[node]["task"]:
+                        if nodes[node]["task"] == task_id:
+                            nodes[node]["task"] = None
+
             try:
                 new_task = self.send_tasks_queue.get(block=False)
                 tasks.append(new_task)
@@ -59,41 +68,43 @@ class MasterNode:
             for task_idx in range(0, len(tasks)):
                 new_task = tasks[task_idx]
 
-                did_error_occur = False
-                for node, node_info in nodes.items():
-                    try:
-                        task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
+                for node in nodes:
+                    if nodes[node]["task"] == None:
+                        did_error_occur = False
 
-                        if self.debug:
-                            print("[*] Sending task " + str(new_task.get_task_id()) + " to " + node)
+                        try:
+                            task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
 
-                        task_socket.send(encode_data(new_task))
-                        task_socket.close()
-
-                        nodes[node]["num_disconnects"] = 0
-                    except socket.error as err:
-                        did_error_occur = True
-
-                        if err.errno == errno.ECONNREFUSED or err.args[0] == "timed out":
                             if self.debug:
-                                print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
+                                print("[*] Sending task " + str(new_task.get_task_id()) + " to " + node)
 
-                            nodes[node]["num_disconnects"] += 1
-                        elif err.errno == errno.EPIPE:
-                            if self.debug:
-                                print("[*] ERROR : Client connection from " + node + " disconnected early")
-                        else:
-                            if self.debug:
-                                print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
+                            task_socket.send(encode_data(new_task))
+                            task_socket.close()
 
-                    nodes[node]["task"] = new_task.get_task_id()
+                            nodes[node]["num_disconnects"] = 0
+                        except socket.error as err:
+                            did_error_occur = True
 
-                if not did_error_occur:
-                    updated_tasks = tasks[:task_idx]
-                    updated_tasks.extend(tasks[task_idx + 1:])
-                    tasks = updated_tasks
+                            if err.errno == errno.ECONNREFUSED or err.args[0] == "timed out":
+                                if self.debug:
+                                    print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
 
-                    break
+                                nodes[node]["num_disconnects"] += 1
+                            elif err.errno == errno.EPIPE:
+                                if self.debug:
+                                    print("[*] ERROR : Client connection from " + node + " disconnected early")
+                            else:
+                                if self.debug:
+                                    print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
+
+                        if not did_error_occur:
+                            nodes[node]["task"] = new_task.get_task_id()
+
+                            updated_tasks = tasks[:task_idx]
+                            updated_tasks.extend(tasks[task_idx + 1:])
+                            tasks = updated_tasks
+
+                            break
 
             sleep(0.1)
 
@@ -167,6 +178,7 @@ class MasterNode:
                     sleep(0.1)
                     time += 0.1
                 else:
+                    self.completed_tasks_output.send(self.completed_tasks[0].get_task_id())
                     return self.completed_tasks[0]
 
             return None
@@ -195,6 +207,7 @@ class MasterNode:
             while time < timeout:
                 completed, data = self.is_task_completed(task_id)
                 if completed:
+                    self.completed_tasks_output.send(task_id)
                     return data
                 else:
                     sleep(0.1)
@@ -203,6 +216,7 @@ class MasterNode:
             while True:
                 completed, data = self.is_task_completed(task_id)
                 if completed:
+                    self.completed_tasks_output.send(task_id)
                     return data
                 else:
                     sleep(0.1)
@@ -248,7 +262,7 @@ class MasterNode:
 
             new_node_compiled = new_node[0] + ":" + str(data["task_port"])
             if new_node_compiled not in nodes:
-                nodes[new_node_compiled] = {"num_disconnects" : 0}
+                nodes[new_node_compiled] = {"num_disconnects" : 0, "task" : None}
                 self.has_connection_output.send(True)
 
                 if self.debug:
