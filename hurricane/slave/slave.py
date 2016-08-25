@@ -61,6 +61,7 @@ class SlaveNode:
         """
         Wait for a task to be sent on the data port.
         """
+        self.wait_for_initialize()
 
         while True:
             try:
