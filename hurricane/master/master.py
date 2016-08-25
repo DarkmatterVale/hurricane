@@ -14,11 +14,12 @@ class MasterNode:
         self.debug = kwargs.get('debug', False)
         self.max_disconnect_errors = kwargs.get('max_disconnect_errors', 3)
 
-        self.nodes = {}
         self.max_connections = 20
         self.task_port = self.initialize_port + 1
         self.task_completion_port = self.initialize_port + 2
         self.scanner_input, self.scanner_output = multiprocessing.Pipe()
+        self.has_connection_input, self.has_connection_output = multiprocessing.Pipe()
+        self.has_connection_tf = False
         self.completed_tasks_queue = multiprocessing.Queue()
         self.completed_tasks = []
         self.send_tasks_queue = multiprocessing.Queue()
@@ -34,17 +35,66 @@ class MasterNode:
         self.scanning_process.start()
 
         if self.debug:
-            print("[*] Starting node management process...")
+            print("[*] Starting task distribution process...")
         self.node_management_process = multiprocessing.Process(target=self.node_manager)
         self.node_management_process.daemon = True
         self.node_management_process.start()
 
     def node_manager(self):
         """
-        This is the main node manager process. All of the task distribution as well
-        as node "maintenance" is completed within this thread.
+        This process manages task distribution within the node network.
         """
+        nodes = {}
+        tasks = []
+
         while True:
+            nodes = self.manage_node_status(nodes)
+
+            try:
+                new_task = self.send_tasks_queue.get(block=False)
+                tasks.append(new_task)
+            except:
+                pass
+
+            for task_idx in range(0, len(tasks)):
+                new_task = tasks[task_idx]
+
+                did_error_occur = False
+                for node, node_info in nodes.items():
+                    try:
+                        task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
+
+                        if self.debug:
+                            print("[*] Sending task " + str(new_task.get_task_id()) + " to " + node)
+
+                        task_socket.send(encode_data(new_task))
+                        task_socket.close()
+
+                        nodes[node]["num_disconnects"] = 0
+                    except socket.error as err:
+                        did_error_occur = True
+
+                        if err.errno == errno.ECONNREFUSED or err.args[0] == "timed out":
+                            if self.debug:
+                                print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
+
+                            nodes[node]["num_disconnects"] += 1
+                        elif err.errno == errno.EPIPE:
+                            if self.debug:
+                                print("[*] ERROR : Client connection from " + node + " disconnected early")
+                        else:
+                            if self.debug:
+                                print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
+
+                    nodes[node]["task"] = new_task.get_task_id()
+
+                if not did_error_occur:
+                    updated_tasks = tasks[:task_idx]
+                    updated_tasks.extend(tasks[task_idx + 1:])
+                    tasks = updated_tasks
+
+                    break
+
             sleep(0.1)
 
     def identify_slaves(self):
@@ -83,9 +133,10 @@ class MasterNode:
 
             self.completed_tasks_queue.put(completed_task)
 
-    def update_completed_tasks_list(self):
+    def is_task_completed(self, task_id):
         """
-        Move all tasks in queue to completed tasks list.
+        Returns "True, generated_data" if the task has been completed,
+        "False, None" if it has not.
         """
         while True:
             try:
@@ -93,15 +144,14 @@ class MasterNode:
             except Empty:
                 break
 
-    def is_task_completed(self, task_id):
-        """
-        Returns "True, generated_data" if the task has been completed,
-        "False, None" if it has not.
-        """
-        self.update_completed_tasks_list()
+        for task_idx in range(0, len(self.completed_tasks)):
+            task = self.completed_tasks[task_idx]
 
-        for task in self.completed_tasks:
             if task_id == task.get_task_id():
+                updated_completed_tasks = self.completed_tasks[:task_idx]
+                updated_completed_tasks.extend(self.completed_tasks[task_idx + 1:])
+                self.completed_tasks = updated_completed_tasks
+
                 return True, task
 
         return False, None
@@ -131,9 +181,9 @@ class MasterNode:
         """
         Wait for the task with task_id to be completed.
         """
-        if self.nodes == {}:
+        if self.has_connection() == False:
             if self.debug:
-                print("[*] ERROR : No nodes are connected and no tasks can be completed")
+                print("[*] ERROR : No nodes are connected...please connect a node then send it a task")
 
             return None
 
@@ -170,9 +220,10 @@ class MasterNode:
         """
         Returns whether this MasterNode has any slave nodes connected
         """
-        self.manage_node_status()
+        while self.has_connection_input.poll():
+            self.has_connection_tf = self.has_connection_input.recv()
 
-        return self.nodes != {}
+        return self.has_connection_tf
 
     def get_host(self, id):
         """
@@ -186,7 +237,7 @@ class MasterNode:
         """
         return id.split(":")[1]
 
-    def manage_node_status(self):
+    def manage_node_status(self, nodes):
         """
         If a host has disconnected, remove them from the known hosts list.
         """
@@ -196,23 +247,33 @@ class MasterNode:
             new_node.extend(data["address"])
 
             new_node_compiled = new_node[0] + ":" + str(data["task_port"])
-            if new_node_compiled not in self.nodes:
-                self.nodes[new_node_compiled] = {"num_disconnects" : 0}
+            if new_node_compiled not in nodes:
+                nodes[new_node_compiled] = {"num_disconnects" : 0}
+                self.has_connection_output.send(True)
 
                 if self.debug:
                     print("[*] Identified new node at " + new_node_compiled)
 
         should_update = False
-        for node, node_info in self.nodes.items():
+        for node, node_info in nodes.items():
             if node_info["num_disconnects"] >= self.max_disconnect_errors:
                 if self.debug:
                     print("[*] Connection with " + node + " has timed out...disconnecting from slave node")
+
+                finish_task = Task(task_id=node_info["task"])
+                self.completed_tasks_queue.put(finish_task)
+
                 new_nodes = {}
-                for inner_node, inner_node_info in self.nodes.items():
+                for inner_node, inner_node_info in nodes.items():
                     if inner_node != node:
                         new_nodes[inner_node] = inner_node_info
 
-                self.nodes = new_nodes
+                nodes = new_nodes
+
+        if nodes == {}:
+            self.has_connection_output.send(False)
+
+        return nodes
 
     def wait_for_connection(self, timeout=-1):
         """
@@ -223,57 +284,23 @@ class MasterNode:
 
         if timeout > 0:
             time = 0
-            while self.nodes == {} and time < timeout:
-                self.manage_node_status()
-
+            while self.has_connection() == False and time < timeout:
                 sleep(0.1)
                 time += 0.1
         else:
-            while self.nodes == {}:
-                self.manage_node_status()
-
+            while self.has_connection() == False:
                 sleep(0.1)
 
     def send_task(self, data):
         """
         Distribute a task to a slave node.
         """
-        self.manage_node_status()
-        if self.nodes == {}:
+        if self.has_connection == False:
             if self.debug:
-                print("[*] ERROR : No nodes are connected to send a task to")
-
-            return
+                print("[*] WARNING : No nodes are connected/available to send a task to...task will be queued until a node is available/connected")
 
         new_task = Task(task_id=generate_task_id(), return_port=self.task_completion_port, data=data)
-        did_error_occur = False
-        for node, node_info in self.nodes.items():
-            try:
-                task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
 
-                if self.debug:
-                    print("[*] Sending task " + str(new_task.get_task_id()) + " to " + node)
+        self.send_tasks_queue.put(new_task)
 
-                task_socket.send(encode_data(new_task))
-                task_socket.close()
-
-                self.nodes[node]["num_disconnects"] = 0
-            except socket.error as err:
-                did_error_occur = True
-
-                if err.errno == errno.ECONNREFUSED or err.args[0] == "timed out":
-                    if self.debug:
-                        print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(self.nodes[node]["num_disconnects"] + 1))
-
-                    self.nodes[node]["num_disconnects"] += 1
-                elif err.errno == errno.EPIPE:
-                    if self.debug:
-                        print("[*] ERROR : Client connection from " + node + " disconnected early")
-                else:
-                    if self.debug:
-                        print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
-
-        if not did_error_occur:
-            return new_task.get_task_id()
-
-        return None
+        return new_task.get_task_id()
