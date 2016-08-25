@@ -59,8 +59,6 @@ class MasterNode:
 
             self.scanner_output.send({"address" : addr, "task_port" : self.task_port, "task_completion_port" : self.task_completion_port})
 
-            print("TASK PORT: " + str(self.task_port))
-            print("TASK COMPLETION PORT: " + str(self.task_completion_port))
             task_completion_monitoring_process = multiprocessing.Process(target=self.complete_tasks, args=(self.task_completion_port,))
             task_completion_monitoring_process.daemon = True
             task_completion_monitoring_process.start()
@@ -104,11 +102,32 @@ class MasterNode:
 
         for task in self.completed_tasks:
             if task_id == task.get_task_id():
-                return True, task.get_generated_data()
+                return True, task
 
         return False, None
 
-    def wait_for_task_to_be_completed(self, task_id, timeout=-1):
+    def wait_for_any_task_completion(self, timeout=-1):
+        """
+        Wait for any task to be completed
+        """
+        if timeout > 0:
+            time = 0
+            while time < timeout:
+                if self.completed_tasks == []:
+                    sleep(0.1)
+                    time += 0.1
+                else:
+                    return self.completed_tasks[0]
+
+            return None
+
+        while True:
+            if self.completed_tasks == []:
+                sleep(0.1)
+            else:
+                return self.completed_tasks[0].get_generated_data()
+
+    def wait_for_task_completion(self, task_id, timeout=-1):
         """
         Wait for the task with task_id to be completed.
         """
