@@ -105,6 +105,10 @@ class MasterNode:
                             tasks = updated_tasks
 
                             break
+                    else:
+                        task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
+                        task_socket.send(encode_data({"connect_reminder" : True}))
+                        task_socket.close()
 
             sleep(0.1)
 
