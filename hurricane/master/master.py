@@ -166,6 +166,14 @@ class MasterNode:
         self.task_port += 2
         self.task_completion_port += 2
 
+    def has_connection(self):
+        """
+        Returns whether this MasterNode has any slave nodes connected
+        """
+        self.manage_node_status()
+
+        return self.nodes != {}
+
     def get_host(self, id):
         """
         Read the host from the id.

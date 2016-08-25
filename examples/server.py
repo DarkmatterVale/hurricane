@@ -7,11 +7,17 @@ if __name__ == '__main__':
 
     server.wait_for_connection()
     while True:
-        task_id = server.send_task({"name" : "server"})
-        generated_data = server.wait_for_task_completion(task_id)
-        print(generated_data.get_generated_data())
-        sleep(3)
-        task_id_2 = server.send_task({"name" : "server2"})
-        generated_data_2 = server.wait_for_task_completion(task_id_2)
-        print(generated_data_2.get_generated_data())
-        sleep(3)
+        if server.has_connection():
+            task_id = server.send_task({"name" : "server"})
+            if task_id != None:
+                generated_data = server.wait_for_task_completion(task_id)
+                print(generated_data.get_generated_data())
+                sleep(3)
+
+            task_id_2 = server.send_task({"name" : "server2"})
+            if task_id_2 != None:
+                generated_data_2 = server.wait_for_task_completion(task_id_2)
+                print(generated_data_2.get_generated_data())
+                sleep(3)
+        else:
+            sleep(0.1)
