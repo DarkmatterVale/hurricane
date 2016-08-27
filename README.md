@@ -26,6 +26,20 @@ Python's native socket library is used to create streams to multiple computers a
 
 Clone this github repository, cd into the ```hurricane``` directory and run ```sudo -H pip3 install .```. Using ```sudo -H``` and ```pip3``` are requirements and must be used to successfully install the library.
 
+The exact commands for linux:
+```
+git clone https://github.com/DarkmatterVale/hurricane.git
+cd hurricane
+sudo -H pip3 install -U .
+```
+
+The exact commands for windoes:
+```
+git clone https://github.com/DarkmatterVale/hurricane.git
+cd hurricane
+python3 -m pip install -U .
+```
+
 ## External Dependencies
 
 The following must be installed externally to use this program on:
