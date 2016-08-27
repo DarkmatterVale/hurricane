@@ -10,7 +10,7 @@ class SlaveNode:
         self.debug = kwargs.get('debug', False)
         self.initialize_port = kwargs.get('initialize_port', 12222)
         self.master_node_address = kwargs.get('master_node', '')
-        self.max_disconnects = kwargs.get('max_disconnect_errors', 3)
+        self.max_disconnects = kwargs.get('max_disconnect_errors', 10)
 
         self.task_port = self.initialize_port + 1
         self.task_completion_port = self.task_port + 1
@@ -92,10 +92,12 @@ class SlaveNode:
 
                     num_disconnects = 0
                 else:
-                    if err.errno == errno.ECONNREFUSED or err.args[0] == "timed out":
+                    if err.errno == errno.ECONNREFUSED:
                         if self.debug:
                             print("[*] ERROR : Connection refused when attempting to connect to master node, try number " + str(num_disconnects + 1))
 
+                        num_disconnects += 1
+                    elif err.args[0] == "timed out":
                         num_disconnects += 1
 
             sleep(0.1)
