@@ -25,6 +25,8 @@ class MasterNode:
         self.completed_tasks = []
         self.send_tasks_queue = multiprocessing.Queue()
 
+        self.exit_signal = multiprocessing.Event()
+
     def initialize(self):
         """
         This method runs in the background and attempts to identify slaves to use.
@@ -41,6 +43,12 @@ class MasterNode:
         self.node_management_process.daemon = True
         self.node_management_process.start()
 
+    def stop(self):
+        """
+        Stop the server and kill all child processes
+        """
+        self.exit_signal.set()
+
     def node_manager(self):
         """
         This process manages task distribution within the node network.
@@ -48,7 +56,7 @@ class MasterNode:
         nodes = {}
         tasks = []
 
-        while True:
+        while not self.exit_signal.is_set():
             nodes = self.manage_node_status(nodes)
 
             while self.completed_tasks_input.poll():
@@ -69,7 +77,7 @@ class MasterNode:
                 new_task = tasks[task_idx]
 
                 for node in nodes:
-                    if nodes[node]["task"] == None:
+                    if not nodes[node]["task"]:
                         did_error_occur = False
 
                         try:
@@ -98,7 +106,7 @@ class MasterNode:
                                     print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
 
                         if not did_error_occur:
-                            nodes[node]["task"] = new_task.get_task_id()
+                            nodes[node]["task"] = new_task
 
                             updated_tasks = tasks[:task_idx]
                             updated_tasks.extend(tasks[task_idx + 1:])
@@ -116,19 +124,23 @@ class MasterNode:
         """
         initialize_socket = create_listen_socket(self.initialize_port, self.max_connections)
 
-        while True:
-            connection, addr = initialize_socket.accept()
-            self.update_available_ports()
+        while not self.exit_signal.is_set():
+            try:
+                connection, addr = initialize_socket.accept()
+                self.update_available_ports()
 
-            self.scanner_output.send({"address" : addr, "task_port" : self.task_port, "task_completion_port" : self.task_completion_port})
+                self.scanner_output.send({"address" : addr, "task_port" : self.task_port, "task_completion_port" : self.task_completion_port})
 
-            task_completion_monitoring_process = multiprocessing.Process(target=self.complete_tasks, args=(self.task_completion_port,))
-            task_completion_monitoring_process.daemon = True
-            task_completion_monitoring_process.start()
-            sleep(0.01)
+                task_completion_monitoring_process = multiprocessing.Process(target=self.complete_tasks, args=(self.task_completion_port,))
+                task_completion_monitoring_process.daemon = True
+                task_completion_monitoring_process.start()
+                sleep(0.01)
 
-            connection.send(encode_data(InitializeMessage(task_port=self.task_port, task_completion_port=self.task_completion_port)))
-            connection.close()
+                connection.send(encode_data(InitializeMessage(task_port=self.task_port, task_completion_port=self.task_completion_port)))
+                connection.close()
+            except socket.error as err:
+                if err.args[0] == "timed out":
+                    pass
 
     def complete_tasks(self, port):
         """
@@ -136,7 +148,7 @@ class MasterNode:
         """
         data_socket = create_listen_socket(port, self.max_connections)
 
-        while True:
+        while not self.exit_signal.is_set():
             c, addr = data_socket.accept()
             completed_task = read_data(c)
             c.close()
@@ -181,7 +193,7 @@ class MasterNode:
         """
         if timeout > 0:
             time = 0
-            while time < timeout:
+            while time < timeout and not self.exit_signal.is_set():
                 if self.completed_tasks == []:
                     self.update_completed_tasks()
 
@@ -193,7 +205,7 @@ class MasterNode:
 
             return None
 
-        while True:
+        while not self.exit_signal.is_set():
             if self.completed_tasks == []:
                 self.update_completed_tasks()
 
@@ -216,7 +228,7 @@ class MasterNode:
 
         if timeout > 0:
             time = 0
-            while time < timeout:
+            while time < timeout and not self.exit_signal.is_set():
                 completed, data = self.is_task_completed(task_id)
                 if completed:
                     self.completed_tasks_output.send(task_id)
@@ -225,7 +237,7 @@ class MasterNode:
                     sleep(0.1)
                     time += 0.1
         else:
-            while True:
+            while not self.exit_signal.is_set():
                 completed, data = self.is_task_completed(task_id)
                 if completed:
                     self.completed_tasks_output.send(task_id)
@@ -314,7 +326,7 @@ class MasterNode:
                 sleep(0.1)
                 time += 0.1
         else:
-            while self.has_connection() == False:
+            while self.has_connection() == False and not self.exit_signal.is_set():
                 sleep(0.1)
 
     def send_task(self, data):
