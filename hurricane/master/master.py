@@ -56,7 +56,7 @@ class MasterNode:
 
                 for node in nodes:
                     if nodes[node]["task"]:
-                        if nodes[node]["task"] == task_id:
+                        if nodes[node]["task"].get_task_id() == task_id:
                             nodes[node]["task"] = None
 
             try:
@@ -106,9 +106,7 @@ class MasterNode:
 
                             break
                     else:
-                        task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
-                        task_socket.send(encode_data({"connect_reminder" : True}))
-                        task_socket.close()
+                        pass
 
             sleep(0.1)
 
@@ -153,11 +151,7 @@ class MasterNode:
         Returns "True, generated_data" if the task has been completed,
         "False, None" if it has not.
         """
-        while True:
-            try:
-                self.completed_tasks.append(self.completed_tasks_queue.get(block=False))
-            except Empty:
-                break
+        self.update_completed_tasks()
 
         for task_idx in range(0, len(self.completed_tasks)):
             task = self.completed_tasks[task_idx]
@@ -171,6 +165,16 @@ class MasterNode:
 
         return False, None
 
+    def update_completed_tasks(self):
+        """
+        Update the completed tasks list from the completed tasks queue.
+        """
+        while True:
+            try:
+                self.completed_tasks.append(self.completed_tasks_queue.get(block=False))
+            except Empty:
+                break
+
     def wait_for_any_task_completion(self, timeout=-1):
         """
         Wait for any task to be completed
@@ -179,6 +183,8 @@ class MasterNode:
             time = 0
             while time < timeout:
                 if self.completed_tasks == []:
+                    self.update_completed_tasks()
+
                     sleep(0.1)
                     time += 0.1
                 else:
@@ -189,9 +195,11 @@ class MasterNode:
 
         while True:
             if self.completed_tasks == []:
+                self.update_completed_tasks()
+
                 sleep(0.1)
             else:
-                return self.completed_tasks[0].get_generated_data()
+                return self.completed_tasks[0]
 
     def wait_for_task_completion(self, task_id, timeout=-1):
         """

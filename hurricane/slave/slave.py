@@ -77,6 +77,7 @@ class SlaveNode:
 
                 c, addr = self.task_socket.accept()
                 self.current_task = read_data(c)
+                print(self.current_task)
 
                 if self.debug:
                     print("[*] Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
