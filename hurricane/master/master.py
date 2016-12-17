@@ -59,13 +59,11 @@ class MasterNode:
             nodes = self.manage_node_status(nodes)
 
             while self.completed_tasks_input.poll():
-                print("IN completed_tasks_input WHILE LOOP")
                 completed_task = self.completed_tasks_input.recv()
 
                 for node in nodes:
                     if nodes[node]["task"]:
                         if nodes[node]["task"].get_task_id() == completed_task.get_task_id():
-                            print("FINISHED TASK")
                             nodes[node]["task"] = None
 
             for node in nodes:
@@ -73,7 +71,6 @@ class MasterNode:
                     task = None
                     try:
                         task = self.send_tasks_queue.get(block=False)
-                        print("ADDING A NEW TASK FROM QUEUE TO TASK LIST")
                     except:
                         pass
 
