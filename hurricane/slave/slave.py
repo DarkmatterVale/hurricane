@@ -10,10 +10,11 @@ class SlaveNode:
         self.debug = kwargs.get('debug', False)
         self.initialize_port = kwargs.get('initialize_port', 12222)
         self.master_node_address = kwargs.get('master_node', '')
-        self.max_disconnects = kwargs.get('max_disconnect_errors', 10)
+        self.max_disconnects = kwargs.get('max_disconnect_errors', 4)
 
         self.task_port = self.initialize_port + 1
         self.task_completion_port = self.task_port + 1
+        self.task_socket = None
         self.scanning_process = None
         self.current_task = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
@@ -50,6 +51,7 @@ class SlaveNode:
                 except:
                     self.task_port = data.get_task_port()
                     self.task_completion_port = data.get_task_completion_port()
+                    self.task_socket = create_listen_socket_timer(self.task_port, 1, 5)
 
             self.scanning_process.terminate()
 
@@ -66,50 +68,51 @@ class SlaveNode:
 
         num_disconnects = 0
         while True:
-            try:
-                self.task_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.task_socket.settimeout(timeout)
-                self.task_socket.bind(('', self.task_port))
-                self.task_socket.listen(1)
+            if self.task_socket:
+                try:
+                    if self.debug:
+                        print("[*] Waiting to receive a new task on port " + str(self.task_port) + "...")
 
-                if self.debug:
-                    print("[*] Waiting to receive a new task on port " + str(self.task_port) + "...")
+                    c, addr = self.task_socket.accept()
+                    self.current_task = read_data(c)
 
-                c, addr = self.task_socket.accept()
-                self.current_task = read_data(c)
-                print(self.current_task)
+                    if self.debug:
+                        print("[*] Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
 
-                if self.debug:
-                    print("[*] Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
+                    return self.current_task.get_data()
+                except socket.error as err:
+                    if num_disconnects > self.max_disconnects:
+                        if self.debug:
+                            print("[*] Attempting to reconnect to master node...")
+                        self.scanning_process = multiprocessing.Process(target=self.complete_network_scan)
+                        self.scanning_process.start()
+                        self.wait_for_initialize()
 
-                return self.current_task.get_data()
-            except socket.error as err:
+                        num_disconnects = 0
+                    else:
+                        if err.errno == errno.ECONNREFUSED:
+                            if self.debug:
+                                print("[*] ERROR : Connection refused when attempting to connect to master node, try number " + str(num_disconnects + 1))
+
+                            num_disconnects += 1
+                        elif err.args[0] == "timed out":
+                            if self.debug:
+                                print("[*] ERROR : Connection timed out when attempting to connect to master node, try number " + str(num_disconnects + 1))
+
+                            num_disconnects += 1
+
                 if num_disconnects > self.max_disconnects:
                     if self.debug:
-                        print("[*] Attempting to reconnect to master node...")
+                        print("[*] Attempting to reconnect to the master node...")
                     self.scanning_process = multiprocessing.Process(target=self.complete_network_scan)
                     self.scanning_process.start()
+
+                    if self.task_socket:
+                        self.task_socket.close()
                     self.wait_for_initialize()
-
                     num_disconnects = 0
-                else:
-                    if err.errno == errno.ECONNREFUSED:
-                        if self.debug:
-                            print("[*] ERROR : Connection refused when attempting to connect to master node, try number " + str(num_disconnects + 1))
-
-                        num_disconnects += 1
-                    elif err.args[0] == "timed out":
-                        num_disconnects += 1
 
             sleep(0.1)
-
-        if time > timeout:
-            if self.debug:
-                print("[*] Attempting to reconnect to the master node...")
-            self.scanning_process = multiprocessing.Process(target=self.complete_network_scan)
-            self.scanning_process.start()
-
-            self.wait_for_initialize()
 
     def finish_task(self, **kwargs):
         """

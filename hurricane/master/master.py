@@ -54,39 +54,39 @@ class MasterNode:
         This process manages task distribution within the node network.
         """
         nodes = {}
-        tasks = []
 
         while not self.exit_signal.is_set():
             nodes = self.manage_node_status(nodes)
 
             while self.completed_tasks_input.poll():
-                task_id = self.completed_tasks_input.recv()
+                print("IN completed_tasks_input WHILE LOOP")
+                completed_task = self.completed_tasks_input.recv()
 
                 for node in nodes:
                     if nodes[node]["task"]:
-                        if nodes[node]["task"].get_task_id() == task_id:
+                        if nodes[node]["task"].get_task_id() == completed_task.get_task_id():
+                            print("FINISHED TASK")
                             nodes[node]["task"] = None
 
-            try:
-                new_task = self.send_tasks_queue.get(block=False)
-                tasks.append(new_task)
-            except:
-                pass
+            for node in nodes:
+                if not nodes[node]["task"]:
+                    task = None
+                    try:
+                        task = self.send_tasks_queue.get(block=False)
+                        print("ADDING A NEW TASK FROM QUEUE TO TASK LIST")
+                    except:
+                        pass
 
-            for task_idx in range(0, len(tasks)):
-                new_task = tasks[task_idx]
-
-                for node in nodes:
-                    if not nodes[node]["task"]:
+                    if task:
                         did_error_occur = False
 
                         try:
                             task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
 
                             if self.debug:
-                                print("[*] Sending task " + str(new_task.get_task_id()) + " to " + node)
+                                print("[*] Sending task " + str(task.get_task_id()) + " to " + node)
 
-                            task_socket.send(encode_data(new_task))
+                            task_socket.send(encode_data(task))
                             task_socket.close()
 
                             nodes[node]["num_disconnects"] = 0
@@ -106,15 +106,7 @@ class MasterNode:
                                     print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
 
                         if not did_error_occur:
-                            nodes[node]["task"] = new_task
-
-                            updated_tasks = tasks[:task_idx]
-                            updated_tasks.extend(tasks[task_idx + 1:])
-                            tasks = updated_tasks
-
-                            break
-                    else:
-                        pass
+                            nodes[node]["task"] = task
 
             sleep(0.1)
 
@@ -122,7 +114,7 @@ class MasterNode:
         """
         Identify slave nodes.
         """
-        initialize_socket = create_listen_socket(self.initialize_port, self.max_connections)
+        initialize_socket = create_listen_socket_timer(self.initialize_port, self.max_connections)
 
         while not self.exit_signal.is_set():
             try:
@@ -156,6 +148,7 @@ class MasterNode:
             if self.debug:
                 print("[*] Received task completion for task " + str(completed_task.get_task_id()))
 
+            self.completed_tasks_output.send(completed_task)
             self.completed_tasks_queue.put(completed_task)
 
     def is_task_completed(self, task_id):
@@ -165,7 +158,7 @@ class MasterNode:
         """
         self.update_completed_tasks()
 
-        for task_idx in range(0, len(self.completed_tasks)):
+        for task_idx in range(len(self.completed_tasks)):
             task = self.completed_tasks[task_idx]
 
             if task_id == task.get_task_id():
@@ -200,8 +193,8 @@ class MasterNode:
                     sleep(0.1)
                     time += 0.1
                 else:
-                    self.completed_tasks_output.send(self.completed_tasks[0].get_task_id())
-                    return self.completed_tasks[0]
+                    #self.completed_tasks_output.send(self.completed_tasks[0].get_task_id())
+                    return self.completed_tasks.pop(0)
 
             return None
 
@@ -211,7 +204,7 @@ class MasterNode:
 
                 sleep(0.1)
             else:
-                return self.completed_tasks[0]
+                return self.completed_tasks.pop(0)
 
     def wait_for_task_completion(self, task_id, timeout=-1):
         """
@@ -231,7 +224,7 @@ class MasterNode:
             while time < timeout and not self.exit_signal.is_set():
                 completed, data = self.is_task_completed(task_id)
                 if completed:
-                    self.completed_tasks_output.send(task_id)
+                    #self.completed_tasks_output.send(task_id)
                     return data
                 else:
                     sleep(0.1)
@@ -240,7 +233,7 @@ class MasterNode:
             while not self.exit_signal.is_set():
                 completed, data = self.is_task_completed(task_id)
                 if completed:
-                    self.completed_tasks_output.send(task_id)
+                    #self.completed_tasks_output.send(task_id)
                     return data
                 else:
                     sleep(0.1)
@@ -297,9 +290,6 @@ class MasterNode:
             if node_info["num_disconnects"] >= self.max_disconnect_errors:
                 if self.debug:
                     print("[*] Connection with " + node + " has timed out...disconnecting from slave node")
-
-                finish_task = Task(task_id=node_info["task"])
-                self.completed_tasks_queue.put(finish_task)
 
                 new_nodes = {}
                 for inner_node, inner_node_info in nodes.items():

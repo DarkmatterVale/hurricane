@@ -20,6 +20,17 @@ def create_listen_socket(port, max_connections):
     listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listen_socket.bind(('', port))
     listen_socket.listen(max_connections)
-    listen_socket.settimeout(10)
+
+    return listen_socket
+
+def create_listen_socket_timer(port, max_connections, timeout=10):
+    """
+    Create a socket to listen on a port with max_connections.
+    """
+    listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listen_socket.bind(('', port))
+    listen_socket.listen(max_connections)
+    listen_socket.settimeout(timeout)
 
     return listen_socket
