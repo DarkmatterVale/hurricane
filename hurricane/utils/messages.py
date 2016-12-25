@@ -25,21 +25,3 @@ def encode_data(data):
     msg = struct.pack('>I', len(msg)) + msg
 
     return msg
-
-class InitializeMessage:
-
-    def __init__(self, **kwargs):
-        self.task_port = kwargs.get("task_port", None)
-        self.task_completion_port = kwargs.get("task_completion_port", None)
-
-    def get_task_port(self):
-        """
-        Returns the task port.
-        """
-        return self.task_port
-
-    def get_task_completion_port(self):
-        """
-        Returns the task completion port.
-        """
-        return self.task_completion_port

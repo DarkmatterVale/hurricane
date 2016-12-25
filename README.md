@@ -33,7 +33,7 @@ cd hurricane
 sudo -H pip3 install -U .
 ```
 
-The exact commands for windoes:
+The exact commands for Windows:
 ```
 git clone https://github.com/DarkmatterVale/hurricane.git
 cd hurricane
@@ -108,7 +108,7 @@ Please see the documentation for in-depth information on using the hurricane lib
 
 ## Examples
 
-Examples are located at https://github.com/DarkmatterVale/hurricane/tree/master/examples
+Examples are located at https://github.com/DarkmatterVale/hurricane/tree/master/samples
 
 ## History
 

@@ -6,6 +6,8 @@ from queue import Empty
 from time import sleep
 from datetime import datetime
 from hurricane.utils import *
+from hurricane.messages import InitializeMessage
+from hurricane.messages import HeartbeatMessage
 
 class MasterNode:
 
@@ -15,6 +17,7 @@ class MasterNode:
         self.max_disconnect_errors = kwargs.get('max_disconnect_errors', 3)
 
         self.max_connections = 20
+        self.connect_timeout = 10
         self.task_port = self.initialize_port + 1
         self.task_completion_port = self.initialize_port + 2
         self.scanner_input, self.scanner_output = multiprocessing.Pipe()
@@ -23,6 +26,8 @@ class MasterNode:
         self.has_connection_tf = False
         self.completed_tasks_queue = multiprocessing.Queue()
         self.completed_tasks = []
+        self.current_tasks_queue = multiprocessing.Queue()
+        self.current_tasks = []
         self.send_tasks_queue = multiprocessing.Queue()
 
         self.exit_signal = multiprocessing.Event()
@@ -66,6 +71,12 @@ class MasterNode:
                         if nodes[node]["task"].get_task_id() == completed_task.get_task_id():
                             nodes[node]["task"] = None
 
+            current_tasks = []
+            for node in nodes:
+                if nodes[node]["task"]:
+                    current_tasks.append(nodes[node]["task"].get_task_id())
+            self.current_tasks_queue.put(current_tasks)
+
             for node in nodes:
                 if not nodes[node]["task"]:
                     task = None
@@ -104,7 +115,31 @@ class MasterNode:
 
                         if not did_error_occur:
                             nodes[node]["task"] = task
+                    else:
+                        try:
+                            if "connect_time" in nodes[node]:
+                                if (datetime.now() - nodes[node]["connect_time"]).total_seconds() > self.connect_timeout:
+                                    task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
+                                    task_socket.send(encode_data(HeartbeatMessage()))
+                                    task_socket.close()
+                                    nodes[node]["num_disconnects"] = 0
+                                    nodes[node]["connect_time"] = datetime.now()
+                            else:
+                                task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
+                                task_socket.send(encode_data(HeartbeatMessage()))
+                                task_socket.close()
+                                nodes[node]["num_disconnects"] = 0
+                                nodes[node]["connect_time"] = datetime.now()
+                        except socket.error as err:
+                            nodes[node]["connect_time"] = datetime.now()
 
+                            if err.errno == errno.ECONNREFUSED:
+                                if self.debug:
+                                    print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
+
+                                nodes[node]["num_disconnects"] += 1
+
+                            sleep(0.5)
             sleep(0.1)
 
     def identify_slaves(self):
@@ -169,11 +204,21 @@ class MasterNode:
 
     def update_completed_tasks(self):
         """
-        Update the completed tasks list from the completed tasks queue.
+        Update the completed tasks list from the completed tasks queue
         """
         while True:
             try:
                 self.completed_tasks.append(self.completed_tasks_queue.get(block=False))
+            except Empty:
+                break
+
+    def update_current_tasks(self):
+        """
+        Update the current tasks lists from the current tasks queue
+        """
+        while True:
+            try:
+                self.current_tasks = self.current_tasks_queue.get(block=False)
             except Empty:
                 break
 
@@ -190,7 +235,6 @@ class MasterNode:
                     sleep(0.1)
                     time += 0.1
                 else:
-                    #self.completed_tasks_output.send(self.completed_tasks[0].get_task_id())
                     return self.completed_tasks.pop(0)
 
             return None
@@ -221,19 +265,21 @@ class MasterNode:
             while time < timeout and not self.exit_signal.is_set():
                 completed, data = self.is_task_completed(task_id)
                 if completed:
-                    #self.completed_tasks_output.send(task_id)
                     return data
                 else:
                     sleep(0.1)
                     time += 0.1
         else:
             while not self.exit_signal.is_set():
-                completed, data = self.is_task_completed(task_id)
-                if completed:
-                    #self.completed_tasks_output.send(task_id)
-                    return data
+                self.update_current_tasks()
+                if task_id in self.current_tasks:
+                    completed, data = self.is_task_completed(task_id)
+                    if completed:
+                        return data
+                    else:
+                        sleep(0.1)
                 else:
-                    sleep(0.1)
+                    return None
 
         return None
 

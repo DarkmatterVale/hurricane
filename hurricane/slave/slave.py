@@ -3,6 +3,8 @@ import errno
 import multiprocessing
 from time import sleep
 from hurricane.utils import *
+from hurricane.messages import HeartbeatMessage
+from hurricane.messages import HeartbeatResponseMessage
 
 class SlaveNode:
 
@@ -76,10 +78,13 @@ class SlaveNode:
                     c, addr = self.task_socket.accept()
                     self.current_task = read_data(c)
 
-                    if self.debug:
-                        print("[*] Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
+                    if not isinstance(self.current_task, HeartbeatMessage):
+                        if self.debug:
+                            print("[*] Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
 
-                    return self.current_task.get_data()
+                        return self.current_task.get_data()
+                    elif self.debug:
+                        print("[*] Heartbeat received from " + str(addr))
                 except socket.error as err:
                     if num_disconnects > self.max_disconnects:
                         if self.debug:
