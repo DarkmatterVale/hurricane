@@ -96,8 +96,11 @@ class SlaveNode:
                             print("[*] Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
 
                         return self.current_task.get_data()
-                    elif self.debug:
-                        print("[*] Heartbeat received from " + str(addr))
+                    else:
+                        if self.debug:
+                            print("[*] Heartbeat received from " + str(addr))
+
+                        num_disconnects = 0
                 except socket.error as err:
                     if num_disconnects > self.max_disconnects:
                         if self.debug:
@@ -114,7 +117,7 @@ class SlaveNode:
 
                             num_disconnects += 1
                         elif err.args[0] == "timed out":
-                            if self.debug:
+                            if self.debug and num_disconnects >= 2:
                                 print("[*] ERROR : Connection timed out when attempting to connect to master node, try number " + str(num_disconnects + 1))
 
                             num_disconnects += 1
