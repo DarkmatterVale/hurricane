@@ -25,4 +25,9 @@ class MessageTypes:
     HEARTBEAT          = "HEARTBEAT_REQUESTED"
     HEARTBEAT_RESPONSE = "RECOGNIZE_HEARTBEAT"
 
+    NEW_NODE           = "NEW_NODE"
+
     INITIALIZE_MSG     = "INITIALIZE"
+    INITIALIZE_NODE    = "INITIALIZE_NODE"
+
+    TASK               = "TASK"

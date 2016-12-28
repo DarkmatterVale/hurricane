@@ -6,8 +6,11 @@ from queue import Empty
 from time import sleep
 from datetime import datetime
 from hurricane.utils import *
-from hurricane.messages import InitializeMessage
+from hurricane.messages import MessageTypes
+from hurricane.messages import TaskManagementMessage
 from hurricane.messages import HeartbeatMessage
+from hurricane.messages import NewNodeMessage
+from hurricane.messages import NodeInitializeMessage
 
 class MasterNode:
 
@@ -153,35 +156,40 @@ class MasterNode:
                 connection, addr = initialize_socket.accept()
                 self.update_available_ports()
 
-                self.scanner_output.send({"address" : addr, "task_port" : self.task_port, "task_completion_port" : self.task_completion_port})
+                self.scanner_output.send(NewNodeMessage(addr, self.task_port, self.task_completion_port))
 
-                task_completion_monitoring_process = multiprocessing.Process(target=self.complete_tasks, args=(self.task_completion_port,))
+                task_completion_monitoring_process = multiprocessing.Process(target=self.node_communication_receiver, args=(self.task_completion_port,))
                 task_completion_monitoring_process.daemon = True
                 task_completion_monitoring_process.start()
                 sleep(0.01)
 
-                connection.send(encode_data(InitializeMessage(task_port=self.task_port, task_completion_port=self.task_completion_port)))
+                connection.send(encode_data(TaskManagementMessage(task_port=self.task_port, task_completion_port=self.task_completion_port)))
                 connection.close()
             except socket.error as err:
                 if err.args[0] == "timed out":
                     pass
 
-    def complete_tasks(self, port):
+    def node_communication_receiver(self, port):
         """
-        Capture the data received data when a task is completed.
+        Capture the data received whenever a node sends data to the master node.
         """
         data_socket = create_listen_socket(port, self.max_connections)
 
         while not self.exit_signal.is_set():
-            c, addr = data_socket.accept()
-            completed_task = read_data(c)
-            c.close()
+            connection, addr = data_socket.accept()
+            data = read_data(connection)
+            connection.close()
 
-            if self.debug:
-                print("[*] Received task completion for task " + str(completed_task.get_task_id()))
+            if data.get_message() == MessageTypes.TASK:
+                completed_task = data.get_task()
 
-            self.completed_tasks_output.send(completed_task)
-            self.completed_tasks_queue.put(completed_task)
+                if self.debug:
+                    print("[*] Received task completion for task " + str(completed_task.get_task_id()))
+
+                self.completed_tasks_output.send(completed_task)
+                self.completed_tasks_queue.put(completed_task)
+            elif data.get_message() == MessageTypes.INITIALIZE_NODE:
+                self.scanner_output.send(NodeInitializeMessage(addr, data.get_cpu_count()))
 
     def is_task_completed(self, task_id):
         """
@@ -307,26 +315,34 @@ class MasterNode:
 
     def get_port(self, id):
         """
-        Read the port from the id.
+        Read the port from the id
         """
         return id.split(":")[1]
 
     def manage_node_status(self, nodes):
         """
-        If a host has disconnected, remove them from the known hosts list.
+        If a host has disconnected, remove them from the known hosts list
         """
         while self.scanner_input.poll():
-            new_node = []
             data = self.scanner_input.recv()
-            new_node.extend(data["address"])
 
-            new_node_compiled = new_node[0] + ":" + str(data["task_port"])
-            if new_node_compiled not in nodes:
-                nodes[new_node_compiled] = {"num_disconnects" : 0, "task" : None}
-                self.has_connection_output.send(True)
+            if isinstance(data, NewNodeMessage):
+                new_node_compiled = str(data.get_addr()[0]) + ":" + str(data.get_task_port())
+                if new_node_compiled not in nodes:
+                    nodes[new_node_compiled] = {"num_disconnects" : 0, "task" : None}
+                    self.has_connection_output.send(True)
 
-                if self.debug:
-                    print("[*] Identified new node at " + new_node_compiled)
+                    if self.debug:
+                        print("[*] Identified new node at " + new_node_compiled)
+            elif isinstance(data, NodeInitializeMessage):
+                address = str(data.get_addr()[0])
+                for node in nodes:
+                    if address in node:
+                        nodes[node]["cpu_count"] = data.get_cpu_count()
+
+                        if self.debug:
+                            print("[*] Got CPU count from node with address of " + address + ": " + str(nodes[node]["cpu_count"]))
+                        break
 
         should_update = False
         for node, node_info in nodes.items():

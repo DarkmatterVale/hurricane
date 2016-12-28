@@ -4,7 +4,9 @@ import multiprocessing
 from time import sleep
 from hurricane.utils import *
 from hurricane.messages import HeartbeatMessage
-from hurricane.messages import HeartbeatResponseMessage
+from hurricane.messages import TaskMessage
+from hurricane.messages import NodeInitializeMessage
+
 
 class SlaveNode:
 
@@ -14,6 +16,7 @@ class SlaveNode:
         self.master_node_address = kwargs.get('master_node', '')
         self.max_disconnects = kwargs.get('max_disconnect_errors', 4)
 
+        self.is_initialized = False
         self.task_port = self.initialize_port + 1
         self.task_completion_port = self.task_port + 1
         self.task_socket = None
@@ -34,10 +37,13 @@ class SlaveNode:
         """
         Pause the current thread until the initialize thread has finished running.
         """
-        if self.scanning_process != None:
-            self.scanning_process.join()
+        if not self.is_initialized:
+            if self.scanning_process != None:
+                self.scanning_process.join()
 
-        self.master_node_init_status()
+                self.master_node_init_status()
+
+            self.is_initialized = True
 
     def master_node_init_status(self):
         """
@@ -58,6 +64,11 @@ class SlaveNode:
             self.scanning_process.terminate()
 
         if self.master_node_address != '':
+            if self.debug:
+                print("[*] Sending initialization information to the master node")
+            completion_socket = create_active_socket(self.master_node_address, self.task_completion_port)
+            completion_socket.send(encode_data(NodeInitializeMessage((None), multiprocessing.cpu_count())))
+
             return True
 
         return False
@@ -76,9 +87,11 @@ class SlaveNode:
                         print("[*] Waiting to receive a new task on port " + str(self.task_port) + "...")
 
                     c, addr = self.task_socket.accept()
-                    self.current_task = read_data(c)
+                    current_task = read_data(c)
 
-                    if not isinstance(self.current_task, HeartbeatMessage):
+                    if not isinstance(current_task, HeartbeatMessage):
+                        self.current_task = current_task
+
                         if self.debug:
                             print("[*] Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
 
@@ -130,7 +143,7 @@ class SlaveNode:
             self.current_task.set_generated_data(kwargs.get('generated_data', None))
 
             completion_socket = create_active_socket(self.master_node_address, self.task_completion_port)
-            completion_socket.send(encode_data(self.current_task))
+            completion_socket.send(encode_data(TaskMessage(self.current_task)))
         else:
             if self.debug:
                 print("[*] ERROR : No task to complete")
