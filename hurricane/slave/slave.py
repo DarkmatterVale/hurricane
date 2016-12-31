@@ -117,16 +117,17 @@ class SlaveNode:
 
                             num_disconnects += 1
                         elif err.args[0] == "timed out":
-                            if self.debug and num_disconnects >= 2:
+                            if self.debug:
                                 print("[*] ERROR : Connection timed out when attempting to connect to master node, try number " + str(num_disconnects + 1))
 
                             num_disconnects += 1
 
-                if num_disconnects > self.max_disconnects:
+                if num_disconnects >= self.max_disconnects:
                     if self.debug:
                         print("[*] Attempting to reconnect to the master node...")
                     self.scanning_process = multiprocessing.Process(target=self.complete_network_scan)
                     self.scanning_process.start()
+                    self.is_initialized = False
 
                     if self.task_socket:
                         self.task_socket.close()

@@ -118,31 +118,31 @@ class MasterNode:
 
                         if not did_error_occur:
                             nodes[node]["task"] = task
-                    else:
-                        try:
-                            if "connect_time" in nodes[node]:
-                                if (datetime.now() - nodes[node]["connect_time"]).total_seconds() > self.connect_timeout:
-                                    task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
-                                    task_socket.send(encode_data(HeartbeatMessage()))
-                                    task_socket.close()
-                                    nodes[node]["num_disconnects"] = 0
-                                    nodes[node]["connect_time"] = datetime.now()
-                            else:
+
+                    try:
+                        if "connect_time" in nodes[node]:
+                            if (datetime.now() - nodes[node]["connect_time"]).total_seconds() > self.connect_timeout:
                                 task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
                                 task_socket.send(encode_data(HeartbeatMessage()))
                                 task_socket.close()
                                 nodes[node]["num_disconnects"] = 0
                                 nodes[node]["connect_time"] = datetime.now()
-                        except socket.error as err:
+                        else:
+                            task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
+                            task_socket.send(encode_data(HeartbeatMessage()))
+                            task_socket.close()
+                            nodes[node]["num_disconnects"] = 0
                             nodes[node]["connect_time"] = datetime.now()
+                    except socket.error as err:
+                        nodes[node]["connect_time"] = datetime.now()
 
-                            if err.errno == errno.ECONNREFUSED:
-                                if self.debug:
-                                    print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
+                        if err.errno == errno.ECONNREFUSED:
+                            if self.debug:
+                                print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
 
-                                nodes[node]["num_disconnects"] += 1
+                            nodes[node]["num_disconnects"] += 1
 
-                            sleep(0.5)
+                        sleep(0.5)
             sleep(0.1)
 
     def identify_slaves(self):
