@@ -126,9 +126,9 @@ Examples are located at https://github.com/DarkmatterVale/hurricane/tree/master/
 In addition to the samples located above, the following are other projects that make use of hurricane:
 
 - SUAS Competition:
-  - https://github.com/FlintHill/SUAS-Competition/SUASImageParser/optimizers/server.py
-  - https://github.com/FlintHill/SUAS-Competition/SUASImageParser/optimizers/worker.py
-  - https://github.com/FlintHill/SUAS-Competition/examples/optimization_client.py
+  - https://github.com/FlintHill/SUAS-Competition/tree/master/SUASImageParser/optimizers/server.py
+  - https://github.com/FlintHill/SUAS-Competition/tree/master/SUASImageParser/optimizers/worker.py
+  - https://github.com/FlintHill/SUAS-Competition/tree/master/examples/optimization_client.py
 
 ## History
 
