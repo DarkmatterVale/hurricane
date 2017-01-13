@@ -1,6 +1,7 @@
 import socket
 import errno
 import multiprocessing
+import logging
 from time import sleep
 from hurricane.utils import *
 from hurricane.messages import HeartbeatMessage
@@ -24,12 +25,14 @@ class SlaveNode:
         self.current_task = None
         self.scanner_input, self.scanner_output= multiprocessing.Pipe()
 
+        logging.basicConfig(format="%(asctime)s %(name)s [%(levelname)s] %(message)s", level=kwargs.get("level", logging.INFO))
+
     def initialize(self):
         """
         Initialize the slave node; scan the network and identify the master node.
         """
-        if self.debug:
-            print("[*] Initializing the node...")
+        logging.info("Initializing the node")
+
         self.scanning_process = multiprocessing.Process(target=self.complete_network_scan)
         self.scanning_process.start()
 
@@ -64,8 +67,8 @@ class SlaveNode:
             self.scanning_process.terminate()
 
         if self.master_node_address != '':
-            if self.debug:
-                print("[*] Sending initialization information to the master node")
+            logging.info("Sending initialization information to the master node")
+
             completion_socket = create_active_socket(self.master_node_address, self.task_completion_port)
             completion_socket.send(encode_data(NodeInitializeMessage((None), multiprocessing.cpu_count())))
 
@@ -83,8 +86,7 @@ class SlaveNode:
         while True:
             if self.task_socket:
                 try:
-                    if self.debug:
-                        print("[*] Waiting to receive a new task on port " + str(self.task_port) + "...")
+                    logging.info("Waiting to receive a new task on port " + str(self.task_port))
 
                     c, addr = self.task_socket.accept()
                     current_task = read_data(c)
@@ -92,19 +94,16 @@ class SlaveNode:
                     if not isinstance(current_task, HeartbeatMessage):
                         self.current_task = current_task
 
-                        if self.debug:
-                            print("[*] Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
+                        logging.info("Received a new task " + str(self.current_task.get_task_id()) + " from " + str(addr))
 
                         return self.current_task.get_data()
                     else:
-                        if self.debug:
-                            print("[*] Heartbeat received from " + str(addr))
+                        logging.info("Heartbeat received from " + str(addr))
 
                         num_disconnects = 0
                 except socket.error as err:
                     if num_disconnects > self.max_disconnects:
-                        if self.debug:
-                            print("[*] Attempting to reconnect to master node...")
+                        logging.info("Attempting to reconnect to master node")
                         self.scanning_process = multiprocessing.Process(target=self.complete_network_scan)
                         self.scanning_process.start()
                         self.wait_for_initialize()
@@ -112,19 +111,17 @@ class SlaveNode:
                         num_disconnects = 0
                     else:
                         if err.errno == errno.ECONNREFUSED:
-                            if self.debug:
-                                print("[*] ERROR : Connection refused when attempting to connect to master node, try number " + str(num_disconnects + 1))
+                            logging.error("Connection refused when attempting to connect to master node, try number " + str(num_disconnects + 1))
 
                             num_disconnects += 1
                         elif err.args[0] == "timed out":
-                            if self.debug:
-                                print("[*] ERROR : Connection timed out when attempting to connect to master node, try number " + str(num_disconnects + 1))
+                            if num_disconnects >= 1:
+                                logging.error("Connection timed out when attempting to connect to master node, try number " + str(num_disconnects + 1))
 
                             num_disconnects += 1
 
                 if num_disconnects >= self.max_disconnects:
-                    if self.debug:
-                        print("[*] Attempting to reconnect to the master node...")
+                    logging.info("Attempting to reconnect to the master node")
                     self.scanning_process = multiprocessing.Process(target=self.complete_network_scan)
                     self.scanning_process.start()
                     self.is_initialized = False
@@ -141,16 +138,14 @@ class SlaveNode:
         Send the task completion data back to the master node.
         """
         if self.current_task != None:
-            if self.debug:
-                print("[*] Completed task " + str(self.current_task.get_task_id()))
+            logging.info("Completed task " + str(self.current_task.get_task_id()))
 
             self.current_task.set_generated_data(kwargs.get('generated_data', None))
 
             completion_socket = create_active_socket(self.master_node_address, self.task_completion_port)
             completion_socket.send(encode_data(TaskMessage(self.current_task)))
         else:
-            if self.debug:
-                print("[*] ERROR : No task to complete")
+            logging.error("No task to complete")
 
     def complete_network_scan(self):
         """
@@ -159,30 +154,26 @@ class SlaveNode:
         while True:
             # Scan the network (if necessary)
             if self.master_node_address == '':
-                if self.debug:
-                    print("[*] Scanning the network to identify active hosts...")
+                logging.info("Scanning the network to identify active hosts")
                 ip_addresses = simple_scan_network()
             else:
                 ip_addresses = [self.master_node_address]
 
             # Identify the master node
             for address in ip_addresses:
-                if self.debug:
-                    print("[*] Attempting to connect to " + str(address) + "...")
+                logging.info("Attempting to connect to " + str(address))
 
                 try:
                     initialize_socket = create_active_socket(address, self.initialize_port)
                     data = read_data(initialize_socket)
                     initialize_socket.close()
 
-                    if self.debug:
-                        print("[*] Successfully connected to " + str(address))
+                    logging.info("Successfully connected to " + str(address))
 
                     # Send the address of the master node to the parent thread
                     self.scanner_output.send({"address" : address})
 
-                    if self.debug:
-                        print("[*] Updated data port to port number " + str(data.get_task_port()))
+                    logging.info("Updated data port to port number " + str(data.get_task_port()))
 
                     # Update the data port
                     self.scanner_output.send(data)

@@ -2,6 +2,7 @@ import socket
 import multiprocessing
 import errno
 import sys
+import logging
 from queue import Empty
 from time import sleep
 from datetime import datetime
@@ -35,18 +36,18 @@ class MasterNode:
 
         self.exit_signal = multiprocessing.Event()
 
+        logging.basicConfig(format="%(asctime)s %(name)s [%(levelname)s] %(message)s", level=kwargs.get("level", logging.INFO))
+
     def initialize(self):
         """
         This method runs in the background and attempts to identify slaves to use.
         """
-        if self.debug:
-            print("[*] Initializing the master node")
-            print("[*] Starting scanning process...")
+        logging.info("Initializing the master node")
+        logging.info("Starting scanning process")
         self.scanning_process = multiprocessing.Process(target=self.identify_slaves)
         self.scanning_process.start()
 
-        if self.debug:
-            print("[*] Starting task distribution process...")
+        logging.info("Starting task distribution process")
         self.node_management_process = multiprocessing.Process(target=self.node_manager)
         self.node_management_process.daemon = True
         self.node_management_process.start()
@@ -94,8 +95,7 @@ class MasterNode:
                         try:
                             task_socket = create_active_socket(self.get_host(node), int(self.get_port(node)))
 
-                            if self.debug:
-                                print("[*] Sending task " + str(task.get_task_id()) + " to " + node)
+                            logging.info("Sending task " + str(task.get_task_id()) + " to " + node)
 
                             task_socket.send(encode_data(task))
                             task_socket.close()
@@ -105,16 +105,13 @@ class MasterNode:
                             did_error_occur = True
 
                             if err.errno == errno.ECONNREFUSED or err.args[0] == "timed out":
-                                if self.debug:
-                                    print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
+                                logging.error("Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
 
                                 nodes[node]["num_disconnects"] += 1
                             elif err.errno == errno.EPIPE:
-                                if self.debug:
-                                    print("[*] ERROR : Client connection from " + node + " disconnected early")
+                                logging.error("Client connection from " + node + " disconnected early")
                             else:
-                                if self.debug:
-                                    print("[*] ERROR : Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
+                                logging.error("Unknown error \"" + err.args[0] + "\" thrown when attempting to send a task to " + node)
 
                         if not did_error_occur:
                             nodes[node]["task"] = task
@@ -137,8 +134,7 @@ class MasterNode:
                         nodes[node]["connect_time"] = datetime.now()
 
                         if err.errno == errno.ECONNREFUSED:
-                            if self.debug:
-                                print("[*] ERROR : Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
+                            logging.error("Connection refused when attempting to send a task to " + node + ", try number " + str(nodes[node]["num_disconnects"] + 1))
 
                             nodes[node]["num_disconnects"] += 1
 
@@ -183,8 +179,7 @@ class MasterNode:
             if data.get_message() == MessageTypes.TASK:
                 completed_task = data.get_task()
 
-                if self.debug:
-                    print("[*] Received task completion for task " + str(completed_task.get_task_id()))
+                logging.info("Received task completion for task " + str(completed_task.get_task_id()))
 
                 self.completed_tasks_output.send(completed_task)
                 self.completed_tasks_queue.put(completed_task)
@@ -260,13 +255,11 @@ class MasterNode:
         Wait for the task with task_id to be completed.
         """
         if self.has_connection() == False:
-            if self.debug:
-                print("[*] ERROR : No nodes are connected...please connect a node then send it a task")
+            logging.error("No nodes are connected...please connect a node then send it a task")
 
             return None
 
-        if self.debug:
-            print("[*] Waiting for task " + str(task_id) + " to be completed")
+        logging.info("Waiting for task " + str(task_id) + " to be completed")
 
         if timeout > 0:
             time = 0
@@ -332,23 +325,21 @@ class MasterNode:
                     nodes[new_node_compiled] = {"num_disconnects" : 0, "task" : None}
                     self.has_connection_output.send(True)
 
-                    if self.debug:
-                        print("[*] Identified new node at " + new_node_compiled)
+                    logging.info("Identified new node at " + new_node_compiled)
             elif isinstance(data, NodeInitializeMessage):
                 address = str(data.get_addr()[0])
                 for node in nodes:
                     if address in node:
                         nodes[node]["cpu_count"] = data.get_cpu_count()
 
-                        if self.debug:
-                            print("[*] Got CPU count from node with address of " + address + ": " + str(nodes[node]["cpu_count"]))
+                        logging.info("Got CPU count from node with address of " + address + ": " + str(nodes[node]["cpu_count"]))
+
                         break
 
         should_update = False
         for node, node_info in nodes.items():
             if node_info["num_disconnects"] >= self.max_disconnect_errors:
-                if self.debug:
-                    print("[*] Connection with " + node + " has timed out...disconnecting from slave node")
+                logging.info("Connection with " + node + " has timed out...disconnecting from slave node")
 
                 new_nodes = {}
                 for inner_node, inner_node_info in nodes.items():
@@ -366,8 +357,7 @@ class MasterNode:
         """
         Block the current thread until there is a slave node to send tasks to
         """
-        if self.debug:
-            print("[*] Waiting for a connection...")
+        logging.info("Waiting for a connection")
 
         if timeout > 0:
             time = 0
@@ -383,8 +373,7 @@ class MasterNode:
         Distribute a task to a slave node.
         """
         if self.has_connection == False:
-            if self.debug:
-                print("[*] WARNING : No nodes are connected/available to send a task to...task will be queued until a node is available/connected")
+            logging.warning("No nodes are connected/available to send a task to...task will be queued until a node is available/connected")
 
         new_task = Task(task_id=generate_task_id(), return_port=self.task_completion_port, data=data)
 
